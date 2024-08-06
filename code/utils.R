@@ -54,7 +54,6 @@ fix_names = \(x, name_type = c('table', 'column')) {
 get_allowed_sync_modes = \(type = c('dataset', 'form')) {
   type = match.arg(type)
   if (type == 'dataset') return(c('overwrite', 'append'))
-  # if (type == 'form') return(c('overwrite', 'append', 'incremental'))
   if (type == 'form') return(c('overwrite', 'append'))
 }
 

@@ -13,8 +13,7 @@ sync_surveycto(scto_params, wh_params)
 # TODO: incremental and deduped sync of form data
 
 # medium priority:
-# TODO: more intelligent fetching of form definitions based on sync_mode
-# TODO: dev and prod environments, based on branch
+# TODO: dev and prod environments based on branch, a la facilitator database
 # TODO: trycatch a la pmparser
 
 # low priority:
