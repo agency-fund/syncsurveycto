@@ -12,13 +12,13 @@ sync_surveycto(scto_params, wh_params)
 
 # high priority:
 # TODO: incremental and deduped sync of form data
-# TODO: google service account stuff
 # TODO: github actions cron schedule
 
 # medium priority:
 # TODO: more intelligent fetching of form definitions based on sync_mode
 # TODO: trycatch a la pmparser
 # TODO: logging with https://daroczig.github.io/logger/, to slack?
+# TODO: dev and prod environments, based on branch
 
 # low priority:
 # TODO: should overwrite be allowed to remove columns or ignore skip criteria?

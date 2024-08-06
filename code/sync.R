@@ -193,4 +193,3 @@ sync_surveycto = \(scto_params, wh_params) {
   }
   invisible(TRUE)
 }
-

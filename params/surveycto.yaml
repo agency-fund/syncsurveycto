@@ -1,12 +1,12 @@
 auth_file: scto_auth.txt
 streams:
-  - id: ttexp1_23_c2
-    sync_mode: overwrite
+  # - id: ttexp1_23_c2
+  #   sync_mode: overwrite
   - id: ttexp1_23_c3
     sync_mode: incremental
   - id: ttexp1_23_c4
     sync_mode: append
-  - id: ttexp1_23_c5
-    sync_mode: overwrite
-  - id: ttexp1_23_c6
-    sync_mode: append
+  # - id: ttexp1_23_c5
+  #   sync_mode: overwrite
+  # - id: ttexp1_23_c6
+  #   sync_mode: append
