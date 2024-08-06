@@ -1,4 +1,9 @@
 auth_file: google-token.json
 platform: bigquery
-project: noorahealth-raw
-dataset: surveycto_noorahealth
+environments:
+  - name: prod
+    project: noorahealth-raw
+    dataset: surveycto_noorahealth
+  - name: dev
+    project: noorahealth-raw
+    dataset: surveycto_noorahealth_dev

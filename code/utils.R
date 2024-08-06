@@ -10,6 +10,16 @@ library('rsurveycto')
 # create secrets GOOGLE_TOKEN and SCTO_AUTH for GitHub Actions
 # make sure GitHub secret SCTO_AUTH has no trailing line break
 
+get_wh_params = \(path) {
+  params_raw = yaml::read_yaml(path)
+  envir = if (Sys.getenv('GITHUB_REF_NAME') == 'main') 'prod' else 'dev'
+  envirs = sapply(params_raw$environments, \(x) x$name)
+  params = c(
+    params_raw[names(params_raw) != 'environments'],
+    params_raw$environments[[which(envirs == envir)]])
+  params
+}
+
 get_scto_auth = function(auth_file = NULL) {
   if (Sys.getenv('SCTO_AUTH') == '') {
     auth_path = file.path('secrets', auth_file)

@@ -31,7 +31,6 @@ sync_table = \(
 
     if (type == 'form_def') {
       key_col = '_form_version'
-      # TODO: what if a column gets added and values are non-null for older versions?
       table_new = table_scto[!table_wh, on = key_col]
       if (cols_equal) {
         if (nrow(table_new) > 0) dbAppendTable(con, name, table_new)

@@ -2,7 +2,7 @@ source(file.path('code', 'utils.R'))
 source(file.path('code', 'sync.R'))
 
 scto_params = yaml::read_yaml(file.path('params', 'surveycto.yaml'))
-wh_params = yaml::read_yaml(file.path('params', 'warehouse.yaml'))
+wh_params = get_wh_params(file.path('params', 'warehouse.yaml'))
 set_bq_auth(wh_params$auth_file)
 
 # registerDoParallel()
@@ -13,7 +13,7 @@ sync_surveycto(scto_params, wh_params)
 # TODO: incremental and deduped sync of form data
 
 # medium priority:
-# TODO: dev and prod environments based on branch, a la facilitator database
+# TODO: table of sync runs (append)
 # TODO: trycatch a la pmparser
 
 # low priority:
