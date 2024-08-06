@@ -1,0 +1,4 @@
+auth_file: google-token.json
+platform: bigquery
+project: noorahealth-raw
+dataset: surveycto_noorahealth
