@@ -172,6 +172,36 @@ sync_form_defs = \(
     extracted_at, type = 'form_def')
 }
 
+sync_runs = \(con, wh_params, extracted_at) {
+  name = '_sync_runs'
+  cols_wh = db_list_fields(con, name)
+
+  env_vars = Sys.getenv(c(
+    'GITHUB_REPOSITORY', 'GITHUB_REF_NAME', 'GITHUB_SHA',
+    'GITHUB_EVENT_NAME', 'GITHUB_RUN_ID', 'GITHUB_RUN_URL', 'USER'))
+  env_vars[env_vars == ''] = NA_character_
+  run_now = setDT(as.list(env_vars))
+  setnames(run_now, tolower)
+  setnames(run_now, 'user', 'local_user')
+
+  is_local = is.na(run_now$github_repository)
+  run_now[, `:=`(
+    local_head = if (is_local) git2r::repository_head()$name else NA_character_,
+    local_sha = if (is_local) git2r::last_commit()$sha else NA_character_,
+    environment = wh_params$name)]
+  set_extracted_cols(run_now, extracted_at)
+
+  if (setequal(cols_wh, colnames(run_now))) {
+    dbAppendTable(con, name, run_now)
+  } else {
+    runs_wh = db_read_table(con, name)
+    runs_rbind = rbind(runs_wh, run_now, use.names = TRUE, fill = TRUE)
+    fields = get_fields(con, runs_rbind)
+    dbWriteTable(con, name, runs_rbind, overwrite = TRUE, fields = fields)
+  }
+  invisible(TRUE)
+}
+
 sync_surveycto = \(scto_params, wh_params) {
   auth = get_scto_auth(scto_params$auth_file)
   streams = rbindlist(scto_params$streams)
@@ -179,6 +209,7 @@ sync_surveycto = \(scto_params, wh_params) {
   con = connect(wh_params)
   extracted_at = .POSIXct(Sys.time(), tz = 'UTC')
   sync_server(auth, con, extracted_at)
+  sync_runs(con, wh_params, extracted_at)
 
   catalog_scto = scto_catalog(auth)
   streams_keep = check_streams(streams, catalog_scto, con)

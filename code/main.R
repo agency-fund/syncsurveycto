@@ -13,7 +13,6 @@ sync_surveycto(scto_params, wh_params)
 # TODO: incremental and deduped sync of form data
 
 # medium priority:
-# TODO: table of sync runs (append)
 # TODO: trycatch a la pmparser
 
 # low priority:
