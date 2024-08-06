@@ -523,7 +523,13 @@
     "rsurveycto": {
       "Package": "rsurveycto",
       "Version": "0.2.0",
-      "Source": "Cellar",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "agency-fund",
+      "RemoteRepo": "rsurveycto",
+      "RemoteRef": "main",
+      "RemoteSha": "c8b01a6c087c5c3385557d0ce9971c7e19e2a7c3",
       "Requirements": [
         "R",
         "checkmate",
@@ -538,7 +544,7 @@
         "rlang",
         "withr"
       ],
-      "Hash": "16c7a2d4d8afc61c91622512a67f3f25"
+      "Hash": "f2756ed20f87d6cbc1de1bb1e49ec796"
     },
     "sys": {
       "Package": "sys",
