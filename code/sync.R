@@ -140,10 +140,9 @@ sync_server = \(auth, con, extracted_at) {
     server_scto = data.table(server_name = auth$servername)
     sync_table(con, table_name, server_scto, 'overwrite', extracted_at)
   } else if (server_wh$server_name != auth$servername) {
-    cli_alert_danger(
-      c('Stopping due to discrepant server names: ',
-        '{.val {server_wh$server_name}} in the warehouse ',
-        'and {.val {auth$servername}} in SurveyCTO.'))
+    cli_abort(paste(
+      'Server names are discrepant: {.val {server_wh$server_name}}',
+      'in the warehouse and {.val {auth$servername}} in SurveyCTO.'))
   }
 }
 
@@ -212,14 +211,34 @@ sync_surveycto = \(scto_params, wh_params) {
   sync_runs(con, wh_params, extracted_at)
 
   catalog_scto = scto_catalog(auth)
-  streams_keep = check_streams(streams, catalog_scto, con)
+  streams_ok = check_streams(streams, catalog_scto, con)
 
-  if (nrow(streams_keep) > 0L) {
-    sync_catalog(con, catalog_scto, 'overwrite', extracted_at)
-    res = foreach(s = iter(streams_keep, by = 'row')) %dopar% {
-      if (getDoParWorkers() > 1L) con = connect(wh_params)
-      sync_stream(auth, con, s$type, s$id, s$sync_mode, extracted_at)
+  if (nrow(streams_ok) > 0L) {
+    sync_catalog(con, catalog_scto, 'append', extracted_at)
+
+    feo = foreach(s = iter(streams_ok, by = 'row'), .errorhandling = 'pass')
+    res = feo %dopar% {
+      if (getDoParWorkers() > 1L) con = connect(wh_params, FALSE)
+
+      caught = tryCatch(
+        sync_stream(auth, con, s$type, s$id, s$sync_mode, extracted_at),
+        error = \(e) e)
+      if (inherits(caught, 'error')) {
+        cli_bullets(
+          c('x' = 'Error while syncing id {.val {s$id}}:',
+            ' ' = as.character(caught)))
+      } else {
+        cli_alert_success('Sync succeeded for id {.val {s$id}}.')
+      }
+      caught
+    }
+
+    idx = sapply(res, \(x) inherits(x, 'error'))
+    if (any(idx)) {
+      ids_err = streams_ok$id[idx]
+      cli_abort('Error while syncing id{?s} {.val {ids_err}}.')
     }
   }
+
   invisible(TRUE)
 }

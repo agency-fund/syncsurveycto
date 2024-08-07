@@ -42,11 +42,20 @@ set_bq_auth = \(auth_file = NULL) {
   bigrquery::bq_auth(path = path)
 }
 
-connect = \(params) {
+connect = \(params, check = TRUE) {
   drv = switch(params$platform, bigquery = bigrquery::bigquery())#,
   # postgres = RPostgres::Postgres(), sqlite = RSQLite::SQLite())
   db_args = params[setdiff(names(params), c('auth_file', 'platform'))]
-  do.call(dbConnect, c(drv = drv, db_args))
+  con = do.call(dbConnect, c(drv = drv, db_args))
+  if (isFALSE(check)) return(con)
+
+  res = tryCatch(dbListTables(con), error = \(e) e)
+  if (inherits(res, 'error')) {
+    p = paste(names(params), params, sep = ': ')
+    p = sapply(p, \(x) c(' ' = x), USE.NAMES = FALSE)
+    cli_abort(c('x' = 'Cannot connect to warehouse using these parameters:', p))
+  }
+  con
 }
 
 fix_names = \(x, name_type = c('table', 'column')) {
@@ -114,68 +123,68 @@ check_streams = \(streams, catalog_scto, con) {
       created_at_ok = is.na(created_at) | created_at == created_at_wh)]
   }
 
-  streams_keep = streams_merge[
+  streams_ok = streams_merge[
     id_in_scto == TRUE & id_unique == TRUE & table_name_unique == TRUE &
       sync_mode_ok == TRUE & type_ok == TRUE & discriminator_ok == TRUE &
       dataset_version_ok == TRUE & created_at_ok == TRUE]
 
   streams_skip = streams_merge[id_in_scto == FALSE]
   if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(
-      c('Skipping the following id{?s}, which {?is/are} ',
-        'not in SurveyCTO: {.val {streams_skip$id}}'))
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, ',
+      'which {?is/are} not in SurveyCTO.'))
   }
 
   streams_skip = streams_merge[id_unique == FALSE]
   if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(
-      c('Skipping the following id{?s}, which {?occurs/occur} multiple ',
-        'times in the yaml file: {.val {unique(streams_skip$id)}}'))
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {unique(streams_skip$id)}}, which ',
+      '{?occurs/occur} multiple times in the yaml file.'))
   }
 
   streams_skip = streams_merge[table_name_unique == FALSE]
   if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(
-      c('Skipping the following id{?s}, whose resulting table ',
-        'names would not be unique: {.val {unique(streams_skip$id)}}'))
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {unique(streams_skip$id)}}, ',
+      'whose resulting table names would not be unique.'))
   }
 
   streams_skip = streams_merge[sync_mode_ok == FALSE]
   if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(
-      c('Skipping the following id{?s}, whose sync mode is not ',
-        'supported for {?its/their} type: {.val {streams_skip$id}}'))
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, whose ',
+      'sync mode is not supported for {?its/their} type.'))
   }
 
   streams_skip = streams_merge[type_ok == FALSE]
   if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(
-      c('Skipping the following id{?s}, whose type has changed ',
-        'since the previous sync: {.val {streams_skip$id}}'))
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, whose ',
+      'type has changed since the previous sync.'))
   }
 
   streams_skip = streams_merge[discriminator_ok == FALSE]
   if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(
-      c('Skipping the following id{?s}, whose dataset discriminator value ',
-        'has changed since the previous sync: {.val {streams_skip$id}}'))
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, whose dataset ',
+      'discriminator value has changed since the previous sync.'))
   }
 
   streams_skip = streams_merge[dataset_version_ok == FALSE]
   if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(
-      c('Skipping the following id{?s}, whose dataset version has ',
-        'decreased since the previous sync: {.val {streams_skip$id}}'))
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, whose dataset ',
+      'version has decreased since the previous sync.'))
   }
 
   streams_skip = streams_merge[created_at_ok == FALSE]
   if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(
-      c('Skipping the following id{?s}, whose "created_at" timestamp ',
-        'has changed since the previous sync: {.val {streams_skip$id}}'))
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, whose creation ',
+      'timestamp has changed since the previous sync.'))
   }
 
-  streams_keep
+  streams_ok
 }
 
 set_extracted_cols = function(d, extracted_at = NULL) {
