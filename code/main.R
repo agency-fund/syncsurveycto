@@ -15,7 +15,7 @@ sync_surveycto(scto_params, wh_params)
 # low priority:
 # TODO: should overwrite be allowed to remove columns or ignore skip criteria?
 # TODO: deal with discrepant column types even if colnames identical
-# TODO: check if review and correction workflow is enabled, and maybe bail
+# TODO: check if review workflow is enabled, and warn depending on sync mode
 
 # overwrite: full refresh overwrite
 # append: full refresh append
