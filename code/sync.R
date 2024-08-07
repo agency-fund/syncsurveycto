@@ -1,7 +1,5 @@
 sync_table = \(
-  con, name, table_scto, sync_mode = c('incremental', 'append', 'overwrite'),
-  extracted_at = NULL, type = NULL) {
-  sync_mode = match.arg(sync_mode)
+  con, name, table_scto, sync_mode, extracted_at = NULL, type = NULL) {
 
   setnames(table_scto, \(x) fix_names(x, name_type = 'column'))
   set_extracted_cols(table_scto, extracted_at)
@@ -11,45 +9,53 @@ sync_table = \(
 
   if (nrow(table_scto) == 0L && sync_mode == 'overwrite' && !is.null(cols_wh)) {
     dbRemoveTable(con, name)
+
   } else if (
     nrow(table_scto) > 0L && (sync_mode == 'overwrite' || is.null(cols_wh))) {
-    fields = get_fields(con, table_scto)
-    dbWriteTable(con, name, table_scto, overwrite = TRUE, fields = fields)
+    db_write_table(con, name, table_scto, overwrite = TRUE)
 
   } else if (nrow(table_scto) > 0L && sync_mode == 'append') {
     if (cols_equal) {
       dbAppendTable(con, name, table_scto)
     } else {
       table_wh = db_read_table(con, name)
-      table_rbind = rbind(table_wh, table_scto, use.names = TRUE, fill = TRUE)
-      fields = get_fields(con, table_rbind)
-      dbWriteTable(con, name, table_rbind, overwrite = TRUE, fields = fields)
+      table_rbind = rbind_custom(table_wh, table_scto)
+      db_write_table(con, name, table_rbind, overwrite = TRUE)
     }
 
-  } else if (nrow(table_scto) > 0L && sync_mode == 'incremental') {
+  } else if (
+    nrow(table_scto) > 0L && sync_mode %in% c('incremental', 'deduped')) {
     table_wh = db_read_table(con, name)
 
-    if (type == 'form_def') {
+    if (isTRUE(type == 'form_def')) { # only incremental
       key_col = '_form_version'
       table_new = table_scto[!table_wh, on = key_col]
-      if (cols_equal) {
-        if (nrow(table_new) > 0) dbAppendTable(con, name, table_new)
-      } else {
-        table_rbind = rbind(table_wh, table_new, use.names = TRUE, fill = TRUE)
-        fields = get_fields(con, table_rbind)
-        if (nrow(table_scto_new) > 0) {
-          dbWriteTable(
-            con, name, table_rbind, overwrite = TRUE, fields = fields)
+      if (nrow(table_new) > 0L) {
+        if (cols_equal) {
+          dbAppendTable(con, name, table_new)
+        } else {
+          table_rbind = rbind_custom(table_wh, table_new)
+          db_write_table(con, name, table_rbind, overwrite = TRUE)
         }
       }
+    } else {
+      table_rbind = rbind_custom(table_wh, table_scto)
+      extracted_cols = c('_extracted_at', '_extracted_uuid')
+      by_cols = setdiff(colnames(table_rbind), extracted_cols)
+      table_keep = unique(table_rbind, by = by_cols)
+      if (sync_mode == 'deduped') {
+        table_keep = table_keep[, .SD[.N], by = 'KEY']
+      }
+      db_write_table(con, name, table_keep, overwrite = TRUE)
     }
   }
+
   invisible(TRUE)
 }
 
 sync_form = \(
   auth, con, id, sync_mode = get_allowed_sync_modes('form'),
-  extracted_at = NULL, cursor_field = 'CompletionDate', primary_key = 'KEY') {
+  extracted_at = NULL) {
   sync_mode = match.arg(sync_mode)
 
   id_wh = fix_names(id)
@@ -71,40 +77,8 @@ sync_form = \(
     return(FALSE)
   }
 
-  if (sync_mode %in% c('overwrite', 'append')) {
-    data_scto = scto_read(auth, id)
-    sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
-
-  } else if (sync_mode == 'incremental') {
-    # setDT(dbGetQuery(con, glue('select min({cursor_field}) from {id}')))
-    data_wh = db_read_table(con, id_wh) # faster than dbGetQuery
-    data_scto = scto_read(auth, id) # pull all data in case deleted fields
-
-    if (!is.null(data_wh) && !(cursor_field %in% colnames(data_wh))) {
-      cli_alert_warning(
-        c('Skipping form {.val {id}} because the cursor field ',
-          '{.val {cursor_field}} is not in the data in the warehouse.'))
-      return(FALSE)
-    }
-
-    if (!(cursor_field %in% colnames(data_scto))) {
-      cli_alert_warning(
-        c('Skipping form {.val {id}} because the cursor field ',
-          '{.val {cursor_field}} is not in the data in SurveyCTO.'))
-      return(FALSE)
-    }
-
-    data_new = if (!is.null(data_wh)) {
-      max_cursor_value = max(data_wh[[cursor_field]])
-      data_scto[x > max_cursor_value, env = list(x = cursor_field)]
-    } else {
-      data_scto
-    }
-
-    if (nrow(data_new) > 0L) {
-      sync_table(con, id_wh, data_new, 'append', extracted_at)
-    }
-  }
+  data_scto = scto_read(auth, id) # pull all data in case deleted fields
+  sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
 
   sm_ver = if (sync_mode == 'overwrite') 'overwrite' else 'append'
   sync_form_versions(con, id_wh, versions_scto, sm_ver, extracted_at)
@@ -194,9 +168,8 @@ sync_runs = \(con, wh_params, extracted_at) {
     dbAppendTable(con, name, run_now)
   } else {
     runs_wh = db_read_table(con, name)
-    runs_rbind = rbind(runs_wh, run_now, use.names = TRUE, fill = TRUE)
-    fields = get_fields(con, runs_rbind)
-    dbWriteTable(con, name, runs_rbind, overwrite = TRUE, fields = fields)
+    runs_rbind = rbind_custom(runs_wh, run_now)
+    db_write_table(con, name, runs_rbind, overwrite = TRUE)
   }
   invisible(TRUE)
 }
@@ -238,6 +211,8 @@ sync_surveycto = \(scto_params, wh_params) {
       ids_err = streams_ok$id[idx]
       cli_abort('Error while syncing id{?s} {.val {ids_err}}.')
     }
+  } else {
+    cli_alert_warning('No valid ids to sync.')
   }
 
   invisible(TRUE)

@@ -9,9 +9,6 @@ set_bq_auth(wh_params$auth_file)
 registerDoSEQ()
 sync_surveycto(scto_params, wh_params)
 
-# high priority:
-# TODO: incremental and deduped sync of form data
-
 # medium priority:
 # TODO: logging with https://daroczig.github.io/logger/, to slack?
 
@@ -19,3 +16,8 @@ sync_surveycto(scto_params, wh_params)
 # TODO: should overwrite be allowed to remove columns or ignore skip criteria?
 # TODO: deal with discrepant column types even if colnames identical
 # TODO: check if review and correction workflow is enabled, and maybe bail
+
+# overwrite: full refresh overwrite
+# append: full refresh append
+# incremental: incremental append
+# deduped: incremental append deduped
