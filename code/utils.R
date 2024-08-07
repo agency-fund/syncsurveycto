@@ -10,6 +10,7 @@ library('rsurveycto')
 # create secrets GOOGLE_TOKEN and SCTO_AUTH for GitHub Actions
 # make sure GitHub secret SCTO_AUTH has no trailing line break
 
+
 get_wh_params = \(path) {
   params_raw = yaml::read_yaml(path)
   envir = if (Sys.getenv('GITHUB_REF_NAME') == 'main') 'prod' else 'dev'
@@ -20,6 +21,7 @@ get_wh_params = \(path) {
   params
 }
 
+
 get_scto_auth = function(auth_file = NULL) {
   if (Sys.getenv('SCTO_AUTH') == '') {
     auth_path = file.path('secrets', auth_file)
@@ -29,6 +31,7 @@ get_scto_auth = function(auth_file = NULL) {
   }
   scto_auth(auth_path)
 }
+
 
 set_bq_auth = \(auth_file = NULL) {
   auth_path = file.path('secrets', auth_file)
@@ -41,6 +44,7 @@ set_bq_auth = \(auth_file = NULL) {
   }
   bigrquery::bq_auth(path = path)
 }
+
 
 connect = \(params, check = TRUE) {
   drv = switch(params$platform, bigquery = bigrquery::bigquery())#,
@@ -58,9 +62,10 @@ connect = \(params, check = TRUE) {
   con
 }
 
+
 fix_names = \(x, name_type = c('table', 'column')) {
   name_type = match.arg(name_type)
-  y = gsub('[^a-zA-Z0-9_]', '_', x) # TODO: consider tolower
+  y = gsub('[^a-zA-Z0-9_]', '_', x) # bigquery is case sensitive
   # hack to prevent name collisions
   idx = x != y
   if (name_type == 'table') {
@@ -70,11 +75,13 @@ fix_names = \(x, name_type = c('table', 'column')) {
   y
 }
 
+
 get_allowed_sync_modes = \(type = c('dataset', 'form')) {
   type = match.arg(type)
   if (type == 'dataset') return(c('overwrite', 'append'))
   if (type == 'form') return(c('overwrite', 'append', 'incremental', 'deduped'))
 }
+
 
 check_streams = \(streams, catalog_scto, con) {
   assert_data_table(streams)
@@ -187,6 +194,7 @@ check_streams = \(streams, catalog_scto, con) {
   streams_ok
 }
 
+
 set_extracted_cols = function(d, extracted_at = NULL) {
   if (!is.null(extracted_at)) {
     assert_posixct(extracted_at, len = 1L, any.missing = FALSE)
@@ -196,20 +204,25 @@ set_extracted_cols = function(d, extracted_at = NULL) {
   set(d, j = '_extracted_uuid', value = uuids)
 }
 
+
 rbind_custom = \(...) rbind(..., use.names = TRUE, fill = TRUE)
+
 
 db_read_table = \(con, name, ...) {
   if (dbExistsTable(con, name)) setDT(dbReadTable(con, name)) else NULL
 }
 
+
 db_list_fields = \(con, name) {
   if (dbExistsTable(con, name)) dbListFields(con, name) else NULL
 }
+
 
 get_fields = \(con, d) {
   if (!inherits(con, 'BigQueryConnection')) return(NULL)
   bigrquery::as_bq_fields(d) # enforce form version as string
 }
+
 
 db_write_table = \(con, name, value, ...) {
   fields = get_fields(con, value)

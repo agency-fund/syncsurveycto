@@ -53,6 +53,7 @@ sync_table = \(
   invisible(TRUE)
 }
 
+
 sync_form = \(
   auth, con, id, sync_mode = get_allowed_sync_modes('form'),
   extracted_at = NULL) {
@@ -93,6 +94,7 @@ sync_form = \(
   invisible(TRUE)
 }
 
+
 sync_dataset = \(
   auth, con, id, sync_mode = get_allowed_sync_modes('dataset'),
   extracted_at = NULL) {
@@ -101,11 +103,13 @@ sync_dataset = \(
   sync_table(con, id, table_scto, sync_mode, extracted_at)
 }
 
+
 sync_stream = \(auth, con, type, id, sync_mode, extracted_at) {
   type = match.arg(type, c('dataset', 'form'))
   sync_func = if (type == 'dataset') sync_dataset else sync_form
   sync_func(auth, con, id, sync_mode, extracted_at)
 }
+
 
 sync_server = \(auth, con, extracted_at) {
   table_name = '_server'
@@ -120,11 +124,13 @@ sync_server = \(auth, con, extracted_at) {
   }
 }
 
+
 sync_catalog = \(
   con, catalog, sync_mode = c('append', 'overwrite'), extracted_at = NULL) {
   sync_mode = match.arg(sync_mode)
   sync_table(con, '_catalog', catalog, sync_mode, extracted_at)
 }
+
 
 sync_form_versions = \(
   con, id_wh, table_scto, sync_mode = c('incremental', 'append', 'overwrite'),
@@ -135,6 +141,7 @@ sync_form_versions = \(
     extracted_at)
 }
 
+
 sync_form_defs = \(
   con, id_wh, table_scto, element = c('survey', 'choices', 'settings'),
   sync_mode = c('incremental', 'append', 'overwrite'), extracted_at = NULL) {
@@ -144,6 +151,7 @@ sync_form_defs = \(
     con, glue('{id_wh}__{element}'), table_scto[, !'_form_id'], sync_mode,
     extracted_at, type = 'form_def')
 }
+
 
 sync_runs = \(con, wh_params, extracted_at) {
   name = '_sync_runs'
@@ -173,6 +181,7 @@ sync_runs = \(con, wh_params, extracted_at) {
   }
   invisible(TRUE)
 }
+
 
 sync_surveycto = \(scto_params, wh_params) {
   auth = get_scto_auth(scto_params$auth_file)
