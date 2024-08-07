@@ -2,8 +2,7 @@
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 on:
   schedule:
-    # - cron: '30 * * * *'
-    - cron: '0 22 1 * *' # 10pm UTC on the first day of every month
+    - cron: '5 20 * * *'
   push:
     branches:
       - 'main'
