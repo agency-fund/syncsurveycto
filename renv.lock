@@ -541,7 +541,7 @@
       "RemoteUsername": "agency-fund",
       "RemoteRepo": "rsurveycto",
       "RemoteRef": "main",
-      "RemoteSha": "7ab35af8e210305a513e804641600e0c23fa832d",
+      "RemoteSha": "d427fdf68eace235d243da995822167436a0fcdc",
       "Requirements": [
         "R",
         "checkmate",
@@ -557,7 +557,7 @@
         "vctrs",
         "withr"
       ],
-      "Hash": "34e2249c2d077bd07fe5459d67ec25db"
+      "Hash": "aca8cdba5f3c4e0453a0e651c969c0e7"
     },
     "sys": {
       "Package": "sys",

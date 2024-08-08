@@ -76,14 +76,33 @@ fix_names = \(x, name_type = c('table', 'column')) {
 }
 
 
-get_allowed_sync_modes = \(type = c('dataset', 'form')) {
-  type = match.arg(type)
-  if (type == 'dataset') return(c('overwrite', 'append'))
-  if (type == 'form') return(c('overwrite', 'append', 'incremental', 'deduped'))
+get_allowed_sync_modes = \(type) {
+  switch(
+    type,
+    catalog = c('overwrite', 'append'),
+    dataset = c('overwrite', 'append'),
+    form = c('overwrite', 'append', 'incremental', 'deduped'),
+    form_versions = c('overwrite', 'incremental'),
+    form_defs = c('overwrite', 'incremental'))
 }
 
 
-check_streams = \(streams, catalog_scto, con) {
+check_form_versions = \(auth, con, id) {
+  id_wh = fix_names(id)
+  versions_wh = db_read_table(con, glue('{id_wh}__versions'))
+  if (is.null(versions_wh)) return(TRUE)
+
+  versions_scto = scto_get_form_metadata(auth, id, get_defs = FALSE)
+  ver_cols = c('form_version', 'date_str', 'actor')
+
+  versions_missing = fsetdiff(
+    versions_wh[, ..ver_cols], versions_scto[, ..ver_cols])
+  ver_ok = nrow(versions_missing) == 0L
+  ver_ok
+}
+
+
+check_streams = \(auth, con, streams, catalog_scto) {
   assert_data_table(streams)
   assert_names(
     colnames(streams), type = 'unique', permutation.of = c('id', 'sync_mode'))
@@ -106,6 +125,12 @@ check_streams = \(streams, catalog_scto, con) {
     type == 'form',
     sync_mode_ok := sync_mode %in% get_allowed_sync_modes('form')]
 
+  streams_merge[type == 'dataset', form_version_ok := TRUE]
+  streams_merge[
+    type == 'form',
+    form_version_ok := check_form_versions(auth, con, .BY$id),
+    by = id]
+
   catalog_wh = db_read_table(con, '_catalog')
 
   if (is.null(catalog_wh)) {
@@ -116,16 +141,17 @@ check_streams = \(streams, catalog_scto, con) {
       created_at_ok = TRUE)]
 
   } else {
-    catalog_wh = catalog_wh[`_extracted_at` == max(`_extracted_at`)]
+    catalog_wh = catalog_wh[ # works for overwrite, append, and deduped
+      , .SD[`_extracted_at` == max(`_extracted_at`)], by = id]
     streams_merge = merge(
       streams_merge, catalog_wh, by = 'id',
       suffixes = c('', '_wh'), all.x = TRUE)
 
     streams_merge[, `:=`(
       type_ok = is.na(type_wh) | type == type_wh,
-      discriminator_ok = type != 'dataset' | is.na(discriminator_wh) |
+      discriminator_ok = type == 'form' | is.na(discriminator_wh) |
         discriminator == discriminator_wh,
-      dataset_version_ok = type != 'dataset' | is.na(dataset_version_wh) |
+      dataset_version_ok = type == 'form' | is.na(dataset_version_wh) |
         dataset_version >= dataset_version_wh,
       created_at_ok = is.na(created_at) | created_at == created_at_wh)]
   }
@@ -133,7 +159,8 @@ check_streams = \(streams, catalog_scto, con) {
   streams_ok = streams_merge[
     id_in_scto == TRUE & id_unique == TRUE & table_name_unique == TRUE &
       sync_mode_ok == TRUE & type_ok == TRUE & discriminator_ok == TRUE &
-      dataset_version_ok == TRUE & created_at_ok == TRUE]
+      dataset_version_ok == TRUE & created_at_ok == TRUE &
+      form_version_ok == TRUE]
 
   streams_skip = streams_merge[id_in_scto == FALSE]
   if (nrow(streams_skip) > 0L) {
@@ -191,6 +218,13 @@ check_streams = \(streams, catalog_scto, con) {
       'timestamp has changed since the previous sync.'))
   }
 
+  streams_skip = streams_merge[form_version_ok == FALSE]
+  if (nrow(streams_skip) > 0L) {
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, which {?has/have} form ',
+      'definition versions in the warehouse that are not in SurveyCTO.'))
+  }
+
   streams_ok
 }
 
@@ -227,4 +261,16 @@ get_fields = \(con, d) {
 db_write_table = \(con, name, value, ...) {
   fields = get_fields(con, value)
   dbWriteTable(con, name, value, fields = fields, ...)
+}
+
+
+db_append_table = \(con, name, value, cols_wh) {
+  if (setequal(cols_wh, colnames(value))) {
+    dbAppendTable(con, name, value)
+  } else {
+    table_wh = db_read_table(con, name)
+    table_rbind = rbind_custom(table_wh, value)
+    db_write_table(con, name, table_rbind, overwrite = TRUE)
+  }
+  invisible(TRUE)
 }
