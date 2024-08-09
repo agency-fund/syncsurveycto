@@ -21,7 +21,7 @@ sync_table = \(
     nrow(table_scto) > 0L && sync_mode %in% c('incremental', 'deduped')) {
     table_wh = db_read_table(con, name)
 
-    if (isTRUE(type == 'form_def')) { # only incremental
+    if (isTRUE(type == 'form_def')) {
       table_new = table_scto[!table_wh, on = '_form_version']
       if (nrow(table_new) > 0L) {
         if (cols_equal) {
@@ -31,6 +31,7 @@ sync_table = \(
           db_write_table(con, name, table_rbind, overwrite = TRUE)
         }
       }
+
     } else {
       table_rbind = rbind_custom(table_wh, table_scto)
       by_cols = setdiff(colnames(table_rbind), get_extracted_colnames())
@@ -53,15 +54,20 @@ sync_form_metadata = \(
   sync_mode = if (sync_mode_form == 'incremental') 'deduped' else sync_mode_form
 
   versions_scto = scto_get_form_metadata(auth, id, get_defs = FALSE)
+  versions_scto = versions_scto[, !'form_id']
+
   id_wh = fix_names(id)
   versions_wh = db_read_table(con, glue('{id_wh}__versions'))
-  versions_new = fsetdiff(
-    versions_scto[, !'form_id'], versions_wh[, !get_extracted_colnames()])
+  if (is.null(versions_wh)) {
+    versions_new = versions_scto
+  } else {
+    versions_wh[, (get_extracted_colnames()) := NULL]
+    versions_new = fsetdiff(versions_scto, versions_wh)
+  }
 
   if (nrow(versions_new) > 0L) {
     sync_table(
-      con, glue('{id_wh}__versions'), versions_scto[, !'form_id'], sync_mode,
-      extracted_at)
+      con, glue('{id_wh}__versions'), versions_scto, sync_mode, extracted_at)
 
     metadata_scto = scto_get_form_metadata(auth, id)
     form_defs = scto_unnest_form_definitions(metadata_scto, by_form_id = FALSE)
