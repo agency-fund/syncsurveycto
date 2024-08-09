@@ -1,13 +1,13 @@
 auth_file: scto_auth.txt
 streams:
-  - id: immunization_measles_endline_survey
-    sync_mode: deduped
+  # - id: immunization_measles_endline_survey
+  #   sync_mode: deduped
   - id: indonesia_mch_2
-    sync_mode: incremental
-  - id: mch_endline_cohort
-    sync_mode: overwrite
-  - id: sncu_fu_teletraining_call_cohort
-    sync_mode: overwrite
+    sync_mode: deduped
+  # - id: mch_endline_cohort
+  #   sync_mode: overwrite
+  # - id: sncu_fu_teletraining_call_cohort
+  #   sync_mode: overwrite
   - id: ttexp1_23_c4
     sync_mode: deduped
   - id: ttexp1_23_c5

@@ -48,7 +48,7 @@ sync_table = \(
 
 
 sync_form = \(
-  auth, con, id, sync_mode = get_allowed_sync_modes('form'),
+  auth, con, id, sync_mode = get_supported_sync_modes('form'),
   extracted_at = NULL) {
   sync_mode = match.arg(sync_mode)
 
@@ -71,10 +71,19 @@ sync_form = \(
 
 
 sync_dataset = \(
-  auth, con, id, sync_mode = get_allowed_sync_modes('dataset'),
+  auth, con, id, sync_mode = get_supported_sync_modes('dataset'),
   extracted_at = NULL) {
   sync_mode = match.arg(sync_mode)
   table_scto = scto_read(auth, id)
+
+  cols_wh = db_list_fields(con, fix_names(id))
+  cols_missing = setdiff(cols_wh, colnames(table_scto))
+  if (!is.null(cols_wh) && length(cols_missing) > 0L) {
+    cli_alert_warning(c(
+      'Skipping dataset {.val {id}}, which has columns ',
+      'in the warehouse that are not in SurveyCTO.'))
+    return(invisible(FALSE))
+  }
   sync_table(con, id, table_scto, sync_mode, extracted_at)
 }
 
@@ -101,7 +110,7 @@ sync_server = \(auth, con, extracted_at) {
 
 
 sync_catalog = \(
-  con, catalog, sync_mode = get_allowed_sync_modes('catalog'),
+  con, catalog, sync_mode = get_supported_sync_modes('catalog'),
   extracted_at = NULL) {
   sync_mode = match.arg(sync_mode)
   sync_table(con, '_catalog', catalog, sync_mode, extracted_at)
@@ -109,7 +118,7 @@ sync_catalog = \(
 
 
 sync_form_versions = \(
-  con, id_wh, table_scto, sync_mode = get_allowed_sync_modes('form_versions'),
+  con, id_wh, table_scto, sync_mode = get_supported_sync_modes('form_versions'),
   extracted_at = NULL) {
   sync_mode = match.arg(sync_mode)
   sync_table(
@@ -120,7 +129,7 @@ sync_form_versions = \(
 
 sync_form_defs = \(
   con, id_wh, table_scto, element = c('survey', 'choices', 'settings'),
-  sync_mode = get_allowed_sync_modes('form_defs'), extracted_at = NULL) {
+  sync_mode = get_supported_sync_modes('form_defs'), extracted_at = NULL) {
   element = match.arg(element)
   sync_mode = match.arg(sync_mode)
   sync_table(
@@ -130,9 +139,6 @@ sync_form_defs = \(
 
 
 sync_runs = \(con, wh_params, extracted_at) {
-  name = '_sync_runs'
-  cols_wh = db_list_fields(con, name)
-
   env_vars = Sys.getenv(c(
     'GITHUB_REPOSITORY', 'GITHUB_REF_NAME', 'GITHUB_SHA',
     'GITHUB_EVENT_NAME', 'GITHUB_RUN_ID', 'GITHUB_RUN_URL', 'USER'))
@@ -146,9 +152,16 @@ sync_runs = \(con, wh_params, extracted_at) {
     local_head = if (is_local) git2r::repository_head()$name else NA_character_,
     local_sha = if (is_local) git2r::last_commit()$sha else NA_character_,
     environment = wh_params$name)]
-  set_extracted_cols(run_now, extracted_at)
 
-  db_append_table(con, name, run_now, cols_wh)
+  sync_table(con, '_runs', run_now, 'append', extracted_at)
+}
+
+
+sync_syncs = \(con, stream, extracted_at) {
+  cols = c(
+    'id', 'type', 'form_version', 'dataset_version', 'created_at',
+    'discriminator', 'sync_mode')
+  sync_table(con, '_syncs', stream[, ..cols], 'append', extracted_at)
 }
 
 
@@ -174,23 +187,33 @@ sync_surveycto = \(scto_params, wh_params) {
       caught = tryCatch(
         sync_stream(auth, con, s$type, s$id, s$sync_mode, extracted_at),
         error = \(e) e)
-      if (inherits(caught, 'error')) {
+      if (isTRUE(caught)) {
+        cli_alert_success('Sync succeeded for id {.val {s$id}}.')
+        sync_syncs(con, s, extracted_at)
+      } else if (inherits(caught, 'error')) {
         cli_bullets(
-          c('x' = 'Error while syncing id {.val {s$id}}:',
+          c('x' = 'Sync failed for id {.val {s$id}}:',
             ' ' = as.character(caught)))
       } else {
-        cli_alert_success('Sync succeeded for id {.val {s$id}}.')
+        cli_alert_warning('Sync skipped for id {.val {s$id}}.')
       }
       caught
     }
 
-    idx = sapply(res, \(x) inherits(x, 'error'))
-    if (any(idx)) {
-      ids_err = streams_ok$id[idx]
-      cli_abort('Error while syncing id{?s} {.val {ids_err}}.')
+    ids_skip = c(
+      setdiff(streams$id, streams_ok$id), streams_ok$id[sapply(res, isFALSE)])
+    if (length(ids_skip) > 0L) {
+      cli_alert_warning('Sync skipped for id{?s} {.val {ids_skip}}.')
     }
+
+    idx_err = sapply(res, \(x) inherits(x, 'error'))
+    if (any(idx_err)) {
+      ids_err = streams_ok$id[idx_err]
+      cli_abort('Sync failed for id{?s} {.val {ids_err}}.')
+    }
+
   } else {
-    cli_alert_warning('No valid ids to sync.')
+    cli_alert_warning('Sync skipped for all ids.')
   }
 
   invisible(TRUE)

@@ -76,7 +76,7 @@ fix_names = \(x, name_type = c('table', 'column')) {
 }
 
 
-get_allowed_sync_modes = \(type) {
+get_supported_sync_modes = \(type) {
   switch(
     type,
     catalog = c('overwrite', 'append'),
@@ -120,10 +120,10 @@ check_streams = \(auth, con, streams, catalog_scto) {
 
   streams_merge[
     type == 'dataset',
-    sync_mode_ok := sync_mode %in% get_allowed_sync_modes('dataset')]
+    sync_mode_ok := sync_mode %in% get_supported_sync_modes('dataset')]
   streams_merge[
     type == 'form',
-    sync_mode_ok := sync_mode %in% get_allowed_sync_modes('form')]
+    sync_mode_ok := sync_mode %in% get_supported_sync_modes('form')]
 
   streams_merge[type == 'dataset', form_version_ok := TRUE]
   streams_merge[
@@ -131,9 +131,9 @@ check_streams = \(auth, con, streams, catalog_scto) {
     form_version_ok := check_form_versions(auth, con, .BY$id),
     by = id]
 
-  catalog_wh = db_read_table(con, '_catalog')
+  syncs_wh = db_read_table(con, '_syncs')
 
-  if (is.null(catalog_wh)) {
+  if (is.null(syncs_wh)) {
     streams_merge[, `:=`(
       type_ok = TRUE,
       discriminator_ok = TRUE,
@@ -141,11 +141,11 @@ check_streams = \(auth, con, streams, catalog_scto) {
       created_at_ok = TRUE)]
 
   } else {
-    catalog_wh = catalog_wh[ # works for overwrite, append, and deduped
+    streams_wh = syncs_wh[
       , .SD[`_extracted_at` == max(`_extracted_at`)], by = id]
     streams_merge = merge(
-      streams_merge, catalog_wh, by = 'id',
-      suffixes = c('', '_wh'), all.x = TRUE)
+      streams_merge, streams_wh, by = 'id', suffixes = c('', '_wh'),
+      all.x = TRUE)
 
     streams_merge[, `:=`(
       type_ok = is.na(type_wh) | type == type_wh,
@@ -153,7 +153,8 @@ check_streams = \(auth, con, streams, catalog_scto) {
         discriminator == discriminator_wh,
       dataset_version_ok = type == 'form' | is.na(dataset_version_wh) |
         dataset_version >= dataset_version_wh,
-      created_at_ok = is.na(created_at) | created_at == created_at_wh)]
+      created_at_ok = is.na(created_at) | is.na(created_at_wh) |
+        created_at == created_at_wh)]
   }
 
   streams_ok = streams_merge[
@@ -200,8 +201,8 @@ check_streams = \(auth, con, streams, catalog_scto) {
   streams_skip = streams_merge[discriminator_ok == FALSE]
   if (nrow(streams_skip) > 0L) {
     cli_alert_warning(c(
-      'Skipping id{?s} {.val {streams_skip$id}}, whose dataset ',
-      'discriminator value has changed since the previous sync.'))
+      'Skipping id{?s} {.val {streams_skip$id}}, whose ',
+      'dataset type has changed since the previous sync.'))
   }
 
   streams_skip = streams_merge[dataset_version_ok == FALSE]
