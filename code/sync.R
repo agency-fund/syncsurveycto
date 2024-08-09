@@ -33,8 +33,7 @@ sync_table = \(
       }
     } else {
       table_rbind = rbind_custom(table_wh, table_scto)
-      extracted_cols = c('_extracted_at', '_extracted_uuid')
-      by_cols = setdiff(colnames(table_rbind), extracted_cols)
+      by_cols = setdiff(colnames(table_rbind), get_extracted_colnames())
       table_keep = unique(table_rbind, by = by_cols)
       if (sync_mode == 'deduped') {
         table_keep = table_keep[, .SD[.N], by = 'KEY']
@@ -43,6 +42,35 @@ sync_table = \(
     }
   }
 
+  invisible(TRUE)
+}
+
+
+sync_form_metadata = \(
+  auth, con, id, sync_mode_form = get_supported_sync_modes('form'),
+  extracted_at = NULL) {
+  sync_mode_form = match.arg(sync_mode_form)
+  sync_mode = if (sync_mode_form == 'incremental') 'deduped' else sync_mode_form
+
+  versions_scto = scto_get_form_metadata(auth, id, get_defs = FALSE)
+  id_wh = fix_names(id)
+  versions_wh = db_read_table(con, glue('{id_wh}__versions'))
+  versions_new = fsetdiff(
+    versions_scto[, !'form_id'], versions_wh[, !get_extracted_colnames()])
+
+  if (nrow(versions_new) > 0L) {
+    sync_table(
+      con, glue('{id_wh}__versions'), versions_scto[, !'form_id'], sync_mode,
+      extracted_at)
+
+    metadata_scto = scto_get_form_metadata(auth, id)
+    form_defs = scto_unnest_form_definitions(metadata_scto, by_form_id = FALSE)
+    for (element in c('survey', 'choices', 'settings')) {
+      sync_table(
+        con, glue('{id_wh}__{element}'), form_defs[[element]][, !'_form_id'],
+        sync_mode, extracted_at, type = 'form_def')
+    }
+  }
   invisible(TRUE)
 }
 
@@ -56,16 +84,7 @@ sync_form = \(
   data_scto = scto_read(auth, id) # pull all data in case deleted fields
   sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
 
-  sm_aux = if (sync_mode == 'overwrite') 'overwrite' else 'incremental'
-  versions_scto = scto_get_form_metadata(auth, id, get_defs = FALSE)
-  sync_form_versions(con, id_wh, versions_scto, sm_aux, extracted_at)
-
-  metadata_scto = scto_get_form_metadata(auth, id)
-  form_defs = scto_unnest_form_definitions(metadata_scto, by_form_id = FALSE)
-  for (element in c('survey', 'choices', 'settings')) {
-    sync_form_defs(
-      con, id_wh, form_defs[[element]], element, sm_aux, extracted_at)
-  }
+  sync_form_metadata(auth, con, id, sync_mode, extracted_at)
   invisible(TRUE)
 }
 
@@ -117,27 +136,6 @@ sync_catalog = \(
 }
 
 
-sync_form_versions = \(
-  con, id_wh, table_scto, sync_mode = get_supported_sync_modes('form_versions'),
-  extracted_at = NULL) {
-  sync_mode = match.arg(sync_mode)
-  sync_table(
-    con, glue('{id_wh}__versions'), table_scto[, !'form_id'], sync_mode,
-    extracted_at)
-}
-
-
-sync_form_defs = \(
-  con, id_wh, table_scto, element = c('survey', 'choices', 'settings'),
-  sync_mode = get_supported_sync_modes('form_defs'), extracted_at = NULL) {
-  element = match.arg(element)
-  sync_mode = match.arg(sync_mode)
-  sync_table(
-    con, glue('{id_wh}__{element}'), table_scto[, !'_form_id'], sync_mode,
-    extracted_at, type = 'form_def')
-}
-
-
 sync_runs = \(con, wh_params, extracted_at) {
   env_vars = Sys.getenv(c(
     'GITHUB_REPOSITORY', 'GITHUB_REF_NAME', 'GITHUB_SHA',
@@ -151,7 +149,7 @@ sync_runs = \(con, wh_params, extracted_at) {
   run_now[, `:=`(
     local_head = if (is_local) git2r::repository_head()$name else NA_character_,
     local_sha = if (is_local) git2r::last_commit()$sha else NA_character_,
-    environment = wh_params$name)]
+    environment = wh_params$environment)]
 
   sync_table(con, '_runs', run_now, 'append', extracted_at)
 }

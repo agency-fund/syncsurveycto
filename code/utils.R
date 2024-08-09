@@ -11,13 +11,14 @@ library('rsurveycto')
 # make sure GitHub secret SCTO_AUTH has no trailing line break
 
 
-get_wh_params = \(path) {
+get_params = \(path) {
   params_raw = yaml::read_yaml(path)
   envir = if (Sys.getenv('GITHUB_REF_NAME') == 'main') 'prod' else 'dev'
   envirs = sapply(params_raw$environments, \(x) x$name)
   params = c(
     params_raw[names(params_raw) != 'environments'],
     params_raw$environments[[which(envirs == envir)]])
+  names(params)[names(params) == 'name'] = 'environment'
   params
 }
 
@@ -81,9 +82,7 @@ get_supported_sync_modes = \(type) {
     type,
     catalog = c('overwrite', 'append'),
     dataset = c('overwrite', 'append'),
-    form = c('overwrite', 'append', 'incremental', 'deduped'),
-    form_versions = c('overwrite', 'incremental'),
-    form_defs = c('overwrite', 'incremental'))
+    form = c('overwrite', 'append', 'incremental', 'deduped'))
 }
 
 
@@ -238,6 +237,9 @@ set_extracted_cols = function(d, extracted_at = NULL) {
   uuids = uuid::UUIDgenerate(n = nrow(d))
   set(d, j = '_extracted_uuid', value = uuids)
 }
+
+
+get_extracted_colnames = \() c('_extracted_at', '_extracted_uuid')
 
 
 rbind_custom = \(...) rbind(..., use.names = TRUE, fill = TRUE)
