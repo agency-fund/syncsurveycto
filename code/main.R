@@ -9,8 +9,6 @@ set_bq_auth(wh_params$auth_file)
 registerDoSEQ()
 sync_surveycto(scto_params, wh_params)
 
-# TODO: check for changes to sync_mode
-
 # low priority:
 # TODO: logging with https://daroczig.github.io/logger/, to slack?
 # TODO: should overwrite be allowed to ignore skip criteria?

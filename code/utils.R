@@ -119,10 +119,10 @@ check_streams = \(auth, con, streams, catalog_scto) {
 
   streams_merge[
     type == 'dataset',
-    sync_mode_ok := sync_mode %in% get_supported_sync_modes('dataset')]
+    sync_mode_supp_ok := sync_mode %in% get_supported_sync_modes('dataset')]
   streams_merge[
     type == 'form',
-    sync_mode_ok := sync_mode %in% get_supported_sync_modes('form')]
+    sync_mode_supp_ok := sync_mode %in% get_supported_sync_modes('form')]
 
   streams_merge[type == 'dataset', form_version_ok := TRUE]
   streams_merge[
@@ -135,6 +135,7 @@ check_streams = \(auth, con, streams, catalog_scto) {
   if (is.null(syncs_wh)) {
     streams_merge[, `:=`(
       type_ok = TRUE,
+      sync_mode_unch_ok = TRUE,
       discriminator_ok = TRUE,
       dataset_version_ok = TRUE,
       created_at_ok = TRUE)]
@@ -148,6 +149,7 @@ check_streams = \(auth, con, streams, catalog_scto) {
 
     streams_merge[, `:=`(
       type_ok = is.na(type_wh) | type == type_wh,
+      sync_mode_unch_ok = is.na(sync_mode_wh) | sync_mode == sync_mode_wh,
       discriminator_ok = type == 'form' | is.na(discriminator_wh) |
         discriminator == discriminator_wh,
       dataset_version_ok = type == 'form' | is.na(dataset_version_wh) |
@@ -158,7 +160,8 @@ check_streams = \(auth, con, streams, catalog_scto) {
 
   streams_ok = streams_merge[
     id_in_scto == TRUE & id_unique == TRUE & table_name_unique == TRUE &
-      sync_mode_ok == TRUE & type_ok == TRUE & discriminator_ok == TRUE &
+      sync_mode_supp_ok == TRUE & sync_mode_unch_ok == TRUE &
+      type_ok == TRUE & discriminator_ok == TRUE &
       dataset_version_ok == TRUE & created_at_ok == TRUE &
       form_version_ok == TRUE]
 
@@ -183,11 +186,18 @@ check_streams = \(auth, con, streams, catalog_scto) {
       'whose resulting table names would not be unique.'))
   }
 
-  streams_skip = streams_merge[sync_mode_ok == FALSE]
+  streams_skip = streams_merge[sync_mode_supp_ok == FALSE]
   if (nrow(streams_skip) > 0L) {
     cli_alert_warning(c(
       'Skipping id{?s} {.val {streams_skip$id}}, whose ',
       'sync mode is not supported for {?its/their} type.'))
+  }
+
+  streams_skip = streams_merge[sync_mode_unch_ok == FALSE]
+  if (nrow(streams_skip) > 0L) {
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, whose ',
+      'sync mode has changed since the previous sync.'))
   }
 
   streams_skip = streams_merge[type_ok == FALSE]
