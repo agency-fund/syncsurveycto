@@ -9,9 +9,7 @@ set_bq_auth(wh_params$auth_file)
 registerDoSEQ()
 sync_surveycto(scto_params, wh_params)
 
-# low priority:
-# TODO: logging with https://daroczig.github.io/logger/, to slack?
-# TODO: should overwrite be allowed to ignore skip criteria?
+# TODO: cli messages or logger in parallel
 # TODO: deal with discrepant column types even if colnames identical
 # TODO: tmp tables that get renamed?
 

@@ -4,7 +4,6 @@ library('data.table')
 library('DBI')
 library('doParallel')
 library('glue')
-library('logger')
 library('rsurveycto')
 
 # create secrets GOOGLE_TOKEN and SCTO_AUTH for GitHub Actions
@@ -67,8 +66,7 @@ connect = \(params, check = TRUE) {
 fix_names = \(x, name_type = c('table', 'column')) {
   name_type = match.arg(name_type)
   y = gsub('[^a-zA-Z0-9_]', '_', x) # bigquery is case sensitive
-  # hack to prevent name collisions
-  idx = x != y
+  idx = x != y # hack to prevent name collisions
   if (name_type == 'table') {
     idx = idx | grepl('^.+__(choices|settings|survey|versions)$', x)
   }
