@@ -251,7 +251,11 @@ set_extracted_cols = function(d, extracted_at = NULL) {
 get_extracted_colnames = \() c('_extracted_at', '_extracted_uuid')
 
 
-rbind_custom = \(...) rbind(..., use.names = TRUE, fill = TRUE)
+rbind_custom = \(...) {
+  d = rbind(..., use.names = TRUE, fill = TRUE)
+  if (!all(get_extracted_colnames() %in% colnames(d))) return(d)
+  setcolorder(d, get_extracted_colnames(), after = ncol(d))[]
+}
 
 
 db_read_table = \(con, name, ...) {

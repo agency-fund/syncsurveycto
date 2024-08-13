@@ -10,13 +10,16 @@ sync_table = \(
   if (nrow(table_scto) == 0L && (sync_mode %in% c('overwrite', 'deduped')) &&
       !is.null(cols_wh)) {
     dbRemoveTable(con, name)
+    num_rows = nrow(table_scto)
 
   } else if (
     nrow(table_scto) > 0L && (sync_mode == 'overwrite' || is.null(cols_wh))) {
     db_write_table(con, name, table_scto, overwrite = TRUE)
+    num_rows = nrow(table_scto)
 
   } else if (nrow(table_scto) > 0L && sync_mode == 'append') {
     db_append_table(con, name, table_scto, cols_wh)
+    num_rows = nrow(table_scto)
 
   } else if (
     nrow(table_scto) > 0L && sync_mode %in% c('incremental', 'deduped')) {
@@ -32,19 +35,23 @@ sync_table = \(
           db_write_table(con, name, table_rbind, overwrite = TRUE)
         }
       }
+      num_rows = nrow(table_new)
 
     } else {
       table_rbind = rbind_custom(table_wh, table_scto)
-      by_cols = setdiff(colnames(table_rbind), get_extracted_colnames())
+      extr_cols = get_extracted_colnames()
+      by_cols = setdiff(colnames(table_rbind), extr_cols)
       table_keep = unique(table_rbind, by = by_cols)
       if (sync_mode == 'deduped') {
         table_keep = table_keep[KEY %in% table_scto$KEY, .SD[.N], by = 'KEY']
       }
       db_write_table(con, name, table_keep, overwrite = TRUE)
+      num_rows = nrow(fsetdiff(
+        table_keep[, ..extr_cols], table_wh[, ..extr_cols])) # perfect < good
     }
   }
 
-  invisible(TRUE)
+  invisible(num_rows)
 }
 
 
@@ -89,10 +96,10 @@ sync_form = \(
 
   id_wh = fix_names(id)
   data_scto = scto_read(auth, id) # pull all data in case deleted fields
-  sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
+  num_rows = sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
 
   sync_form_metadata(auth, con, id, sync_mode, extracted_at)
-  invisible(TRUE)
+  invisible(num_rows)
 }
 
 
@@ -108,7 +115,7 @@ sync_dataset = \(
     cli_alert_warning(c(
       'Skipping dataset {.val {id}}, which has columns ',
       'in the warehouse that are not in SurveyCTO.'))
-    return(invisible(FALSE))
+    return(invisible(-1L))
   }
   sync_table(con, id, table_scto, sync_mode, extracted_at)
 }
@@ -155,11 +162,12 @@ sync_runs = \(con, wh_params, extracted_at) {
 }
 
 
-sync_syncs = \(con, stream, extracted_at) {
+sync_syncs = \(con, stream, num_rows, extracted_at) {
   cols = c(
     'id', 'type', 'form_version', 'dataset_version', 'created_at',
     'discriminator', 'sync_mode')
-  sync_table(con, '_syncs', stream[, ..cols], 'append', extracted_at)
+  d = stream[, ..cols][, num_rows_loaded := num_rows]
+  sync_table(con, '_syncs', d, 'append', extracted_at)
 }
 
 
@@ -183,24 +191,24 @@ sync_surveycto = \(scto_params, wh_params) {
       if (getDoParWorkers() > 1L) con = connect(wh_params, FALSE)
 
       sync_stream = if (s$type == 'dataset') sync_dataset else sync_form
-      caught = tryCatch(
+      n = tryCatch(
         sync_stream(auth, con, s$id, s$sync_mode, extracted_at), error = \(e) e)
 
-      if (isTRUE(caught)) {
-        cli_alert_success('Sync succeeded for id {.val {s$id}}.')
-        sync_syncs(con, s, extracted_at)
-      } else if (inherits(caught, 'error')) {
+      if (inherits(n, 'error')) {
         cli_bullets(
-          c('x' = 'Sync failed for id {.val {s$id}}:',
-            ' ' = as.character(caught)))
+          c('x' = 'Sync failed for id {.val {s$id}}:', ' ' = as.character(n)))
+      } else if (n >= 0L) {
+        cli_alert_success(
+          'Sync succeeded for id {.val {s$id}}, {n} rows loaded.')
+        sync_syncs(con, s, n, extracted_at)
       } else {
         cli_alert_warning('Sync skipped for id {.val {s$id}}.')
       }
-      caught
+      n
     }
 
-    ids_skip = c(
-      setdiff(streams$id, streams_ok$id), streams_ok$id[sapply(res, isFALSE)])
+    idx_skip = sapply(res, \(x) is.numeric(x) && x < 0)
+    ids_skip = c(setdiff(streams$id, streams_ok$id), streams_ok$id[idx_skip])
     if (length(ids_skip) > 0L) {
       cli_alert_warning('Sync skipped for id{?s} {.val {ids_skip}}.')
     }
