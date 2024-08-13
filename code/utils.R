@@ -65,6 +65,7 @@ connect = \(params, check = TRUE) {
 
 fix_names = \(x, name_type = c('table', 'column')) {
   name_type = match.arg(name_type)
+  # https://cloud.google.com/bigquery/docs/schemas#column_names
   y = gsub('[^a-zA-Z0-9_]', '_', x) # bigquery is case sensitive
   idx = x != y # hack to prevent name collisions
   if (name_type == 'table') {

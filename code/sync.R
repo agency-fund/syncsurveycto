@@ -37,7 +37,7 @@ sync_table = \(
       by_cols = setdiff(colnames(table_rbind), get_extracted_colnames())
       table_keep = unique(table_rbind, by = by_cols)
       if (sync_mode == 'deduped') {
-        table_keep = table_keep[, .SD[.N], by = 'KEY']
+        table_keep = table_keep[KEY %in% table_scto$KEY, .SD[.N], by = 'KEY']
       }
       db_write_table(con, name, table_keep, overwrite = TRUE)
     }
@@ -113,13 +113,6 @@ sync_dataset = \(
 }
 
 
-sync_stream = \(auth, con, type, id, sync_mode, extracted_at) {
-  type = match.arg(type, c('dataset', 'form'))
-  sync_func = if (type == 'dataset') sync_dataset else sync_form
-  sync_func(auth, con, id, sync_mode, extracted_at)
-}
-
-
 sync_server = \(auth, con, extracted_at) {
   table_name = '_server'
   server_wh = db_read_table(con, table_name)
@@ -188,9 +181,10 @@ sync_surveycto = \(scto_params, wh_params) {
     res = feo %dopar% {
       if (getDoParWorkers() > 1L) con = connect(wh_params, FALSE)
 
+      sync_stream = if (s$type == 'dataset') sync_dataset else sync_form
       caught = tryCatch(
-        sync_stream(auth, con, s$type, s$id, s$sync_mode, extracted_at),
-        error = \(e) e)
+        sync_stream(auth, con, s$id, s$sync_mode, extracted_at), error = \(e) e)
+
       if (isTRUE(caught)) {
         cli_alert_success('Sync succeeded for id {.val {s$id}}.')
         sync_syncs(con, s, extracted_at)
