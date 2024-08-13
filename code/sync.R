@@ -7,7 +7,8 @@ sync_table = \(
   cols_wh = db_list_fields(con, name)
   cols_equal = setequal(cols_wh, colnames(table_scto))
 
-  if (nrow(table_scto) == 0L && sync_mode == 'overwrite' && !is.null(cols_wh)) {
+  if (nrow(table_scto) == 0L && (sync_mode %in% c('overwrite', 'deduped')) &&
+      !is.null(cols_wh)) {
     dbRemoveTable(con, name)
 
   } else if (
