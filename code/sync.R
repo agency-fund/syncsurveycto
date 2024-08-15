@@ -199,7 +199,7 @@ sync_surveycto = \(scto_params, wh_params) {
           c('x' = 'Sync failed for id {.val {s$id}}:', ' ' = as.character(n)))
       } else if (n >= 0L) {
         cli_alert_success(
-          'Sync succeeded for id {.val {s$id}}, {n} rows loaded.')
+          'Sync succeeded for id {.val {s$id}}, {n} row{?s} loaded.')
         sync_syncs(con, s, n, extracted_at)
       } else {
         cli_alert_warning('Sync skipped for id {.val {s$id}}.')
