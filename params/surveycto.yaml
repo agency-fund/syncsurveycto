@@ -6,6 +6,8 @@ environments:
     streams:
       - id: indonesia_mch_2
         sync_mode: deduped
+      - id: covid_teletraining_cohort
+        sync_mode: overwrite
   # <<<<< THIS IS SPARTA!
 
   - name: dev
