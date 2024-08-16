@@ -112,8 +112,8 @@ sync_dataset = \(
   cols_wh = db_list_fields(con, fix_names(id))
   cols_scto = fix_names(colnames(table_scto), 'column')
   cols_missing = setdiff(cols_wh, c(cols_scto, get_extracted_colnames()))
-  if (length(cols_missing) > 0L) { # check for datasets, since no created_at
-    cli_alert_warning(c(
+  if (!is.null(cols_wh) && length(cols_missing) > 0L) {
+    cli_alert_warning(c( # check for datasets, since no created_at
       'Skipping dataset {.val {id}}, which has columns ',
       'in the warehouse that are not in SurveyCTO.'))
     return(invisible(-1L))
