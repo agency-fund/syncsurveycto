@@ -95,7 +95,7 @@ sync_form = \(
   sync_mode = match.arg(sync_mode)
 
   id_wh = fix_names(id)
-  data_scto = scto_read(auth, id) # pull all data in case deleted fields
+  data_scto = scto_read(auth, id) # pull all in case deleted fields or records
   num_rows = sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
 
   sync_form_metadata(auth, con, id, sync_mode, extracted_at)
