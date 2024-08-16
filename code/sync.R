@@ -1,7 +1,7 @@
 sync_table = \(
   con, name, table_scto, sync_mode, extracted_at = NULL, type = NULL) {
 
-  setnames(table_scto, \(x) fix_names(x, name_type = 'column'))
+  setnames(table_scto, \(x) fix_names(x, 'column'))
   set_extracted_cols(table_scto, extracted_at)
 
   cols_wh = db_list_fields(con, name)
@@ -38,11 +38,11 @@ sync_table = \(
       num_rows = nrow(table_new)
 
     } else {
-      table_rbind = rbind_custom(table_wh, table_scto)
+      table_rbind = rbind_custom(table_wh, table_scto) # 1 or 2 rows per KEY
       extr_cols = get_extracted_colnames()
       by_cols = setdiff(colnames(table_rbind), extr_cols)
-      table_keep = unique(table_rbind, by = by_cols)
-      if (sync_mode == 'deduped') {
+      table_keep = unique(table_rbind, by = by_cols) # if 2 dupes, keep earlier
+      if (sync_mode == 'deduped') { # if 2 rows of same KEY, keep later
         table_keep = table_keep[KEY %in% table_scto$KEY, .SD[.N], by = 'KEY']
       }
       db_write_table(con, name, table_keep, overwrite = TRUE)
@@ -110,8 +110,9 @@ sync_dataset = \(
   table_scto = scto_read(auth, id)
 
   cols_wh = db_list_fields(con, fix_names(id))
-  cols_missing = setdiff(cols_wh, colnames(table_scto))
-  if (!is.null(cols_wh) && length(cols_missing) > 0L) {
+  cols_scto = fix_names(colnames(table_scto), 'column')
+  cols_missing = setdiff(cols_wh, c(cols_scto, get_extracted_colnames()))
+  if (length(cols_missing) > 0L) { # check for datasets, since no created_at
     cli_alert_warning(c(
       'Skipping dataset {.val {id}}, which has columns ',
       'in the warehouse that are not in SurveyCTO.'))
