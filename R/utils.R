@@ -267,8 +267,9 @@ set_extracted_cols = function(d, extracted_at = NULL) {
 get_extracted_colnames = \() c('_extracted_at', '_extracted_uuid')
 
 
-get_package_version = function(package = 'syncsurveycto') {
-  as.character(utils::packageVersion(package))
+set_package_version = \(d, pkg = 'syncsurveycto') {
+  set(d, j = glue('{pkg}_version'),
+      value = as.character(utils::packageVersion(pkg)))
 }
 
 

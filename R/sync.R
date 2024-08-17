@@ -156,7 +156,7 @@ sync_runs = \(con, wh_params, extracted_at) {
   setnames(run_now, 'user', 'local_user')
 
   set(run_now, j = 'environment', value = wh_params$environment)
-  set(run_now, j = 'syncsurveycto_version', value = get_package_version())
+  set_package_version(run_now)
 
   sync_table(con, '_runs', run_now, 'append', extracted_at)
 }
@@ -168,7 +168,7 @@ sync_syncs = \(con, stream, num_rows, extracted_at) {
     'discriminator', 'sync_mode')
   d = stream[, cols, with = FALSE]
   set(d, j = 'num_rows_loaded', value = num_rows)
-  set(d, j = 'syncsurveycto_version', value = get_package_version())
+  set_package_version(d)
   sync_table(con, '_syncs', d, 'append', extracted_at)
 }
 
@@ -189,61 +189,66 @@ sync_surveycto = \(scto_params, wh_params) {
 
   con = connect(wh_params)
   extracted_at = .POSIXct(Sys.time(), tz = 'UTC')
+
   sync_server(auth, con, extracted_at)
   sync_runs(con, wh_params, extracted_at)
 
   catalog_scto = scto_catalog(auth)
+  sync_catalog(con, catalog_scto, 'overwrite', extracted_at)
+
+  if (nrow(streams) == 0L) {
+    cli_alert_info('No ids to sync.')
+    return(invisible(TRUE))
+  }
+
   streams_ok = check_streams(auth, con, streams, catalog_scto)
+  if (nrow(streams_ok) == 0L) {
+    cli_alert_warning('Sync skipped for id{?s} {.val {streams$id}}.')
+    return(invisible(TRUE))
+  }
 
-  if (nrow(streams_ok) > 0L) {
-    sync_catalog(con, catalog_scto, 'overwrite', extracted_at)
+  s = NULL
+  feo = foreach(s = iterators::iter(streams_ok, by = 'row'))
+  res = feo %dopar% {
+    if (getDoParWorkers() > 1L) con = connect(wh_params, FALSE)
 
-    s = NULL
-    feo = foreach(s = iterators::iter(streams_ok, by = 'row'))
-    res = feo %dopar% {
-      if (getDoParWorkers() > 1L) con = connect(wh_params, FALSE)
+    sync_stream = if (s$type == 'dataset') sync_dataset else sync_form
+    n = tryCatch(
+      sync_stream(auth, con, s$id, s$sync_mode, extracted_at), error = \(e) e)
 
-      sync_stream = if (s$type == 'dataset') sync_dataset else sync_form
-      n = tryCatch(
-        sync_stream(auth, con, s$id, s$sync_mode, extracted_at), error = \(e) e)
-
-      if (inherits(n, 'error')) {
-        cli_bullets(
-          c('x' = 'Sync failed for id {.val {s$id}}:', ' ' = as.character(n)))
-      } else if (n >= 0L) {
-        cli_alert_success(
-          'Sync succeeded for id {.val {s$id}}, {n} row{?s} loaded.')
-        sync_syncs(con, s, n, extracted_at)
-      } else {
-        cli_alert_warning('Sync skipped for id {.val {s$id}}.')
-      }
-      n
+    if (inherits(n, 'error')) {
+      cli_bullets(
+        c('x' = 'Sync failed for id {.val {s$id}}:', ' ' = as.character(n)))
+    } else if (n >= 0L) {
+      cli_alert_success(
+        'Sync succeeded for id {.val {s$id}}, {n} row{?s} loaded.')
+      sync_syncs(con, s, n, extracted_at)
+    } else {
+      cli_alert_warning('Sync skipped for id {.val {s$id}}.')
     }
+    n
+  }
 
-    status = sapply(res, \(x) {
-      if (inherits(x, 'error')) 'failed'
-      else if (x >= 0L) 'succeeded'
-      else 'skipped'
-    })
+  status = sapply(res, \(x) {
+    if (inherits(x, 'error')) 'failed'
+    else if (x >= 0L) 'succeeded'
+    else 'skipped'
+  })
 
-    ids_succeed = streams_ok$id[status == 'succeeded']
-    if (length(ids_succeed) > 0L) {
-      cli_alert_success('Sync succeeded for id{?s} {.val {ids_succeed}}.')
-    }
+  ids_succeed = streams_ok$id[status == 'succeeded']
+  if (length(ids_succeed) > 0L) {
+    cli_alert_success('Sync succeeded for id{?s} {.val {ids_succeed}}.')
+  }
 
-    ids_skip = c(
-      setdiff(streams$id, streams_ok$id), streams_ok$id[status == 'skipped'])
-    if (length(ids_skip) > 0L) {
-      cli_alert_warning('Sync skipped for id{?s} {.val {ids_skip}}.')
-    }
+  ids_skip = c(
+    setdiff(streams$id, streams_ok$id), streams_ok$id[status == 'skipped'])
+  if (length(ids_skip) > 0L) {
+    cli_alert_warning('Sync skipped for id{?s} {.val {ids_skip}}.')
+  }
 
-    ids_fail = streams_ok$id[status == 'failed']
-    if (length(ids_fail) > 0L) {
-      cli_abort('Sync failed for id{?s} {.val {ids_fail}}.')
-    }
-
-  } else {
-    cli_alert_warning('Sync skipped for all ids.')
+  ids_fail = streams_ok$id[status == 'failed']
+  if (length(ids_fail) > 0L) {
+    cli_abort('Sync failed for id{?s} {.val {ids_fail}}.')
   }
 
   invisible(TRUE)

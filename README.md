@@ -13,9 +13,8 @@ stuff.
 Install the development version:
 
 ```r
-if (!requireNamespace('remotes', quietly = TRUE))
-  install.packages('remotes')
-remotes::install_github('agency-fund/syncsurveycto')
+# install.packages('pak')
+pak::pak('agency-fund/syncsurveycto')
 ```
 
 ## Usage
