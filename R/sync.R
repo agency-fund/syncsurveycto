@@ -1,4 +1,4 @@
-sync_table = \(
+sync_table = \( # nolint
   con, name, table_scto, sync_mode, extracted_at = NULL, type = NULL) {
 
   setnames(table_scto, \(x) fix_names(x, 'column'))
