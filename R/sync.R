@@ -38,7 +38,7 @@ sync_table = \(
       num_rows = nrow(table_new)
 
     } else {
-      KEY = NULL
+      KEY = NULL # nolint
       table_rbind = rbind_custom(table_wh, table_scto) # 1 or 2 rows per KEY
       extr_cols = get_extracted_colnames()
       by_cols = setdiff(colnames(table_rbind), extr_cols)
@@ -155,7 +155,6 @@ sync_runs = \(con, wh_params, extracted_at) {
   setnames(run_now, tolower)
   setnames(run_now, 'user', 'local_user')
 
-  is_local = is.na(run_now$github_repository)
   set(run_now, j = 'environment', value = wh_params$environment)
   set(run_now, j = 'syncsurveycto_version', value = get_package_version())
 

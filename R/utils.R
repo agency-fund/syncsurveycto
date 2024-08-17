@@ -115,7 +115,7 @@ check_streams = \(auth, con, streams, catalog_scto) {
     colnames(streams), type = 'unique', permutation.of = c('id', 'sync_mode'))
 
   table_name = id = type = id_unique = sync_mode_supp_ok = sync_mode =
-    form_version_ok = `_extracted_at` = type_wh = sync_mode_wh =
+    form_version_ok = `_extracted_at` = type_wh = sync_mode_wh = # nolint
     discriminator_wh = discriminator = dataset_version_wh = dataset_version =
     created_at = created_at_wh = id_in_scto = sync_mode_unch_ok = type_ok =
     discriminator_ok = created_at_ok = table_name_unique = dataset_version_ok =
@@ -268,7 +268,8 @@ get_extracted_colnames = \() c('_extracted_at', '_extracted_uuid')
 
 
 get_package_version = function(package = 'syncsurveycto') {
-  as.character(utils::packageVersion(package))}
+  as.character(utils::packageVersion(package))
+}
 
 
 rbind_custom = \(...) {
