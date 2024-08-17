@@ -40,8 +40,8 @@ get_scto_auth = function(auth_file = NULL) {
 
 set_bq_auth = \(auth_file = NULL) {
   auth_path = file.path('secrets', auth_file)
-  path = if (Sys.getenv('GOOGLE_TOKEN') != '') {
-    Sys.getenv('GOOGLE_TOKEN')
+  path = if (Sys.getenv('WH_AUTH') != '') {
+    Sys.getenv('WH_AUTH')
   } else if (!is.null(auth_file) && file.exists(auth_path)) {
     auth_path
   } else {
