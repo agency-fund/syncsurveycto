@@ -67,21 +67,6 @@
 <div class="section level2">
 <h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
 </h2>
-<ol style="list-style-type: decimal">
-<li><p>create secrets folder</p></li>
-<li><p>in secrets folder, create scto_auth.txt</p></li>
-<li><p>create service account</p></li>
-<li><p>download json key, move it to secrets folder</p></li>
-<li><p>for the project, give service account the role “bigquery user”</p></li>
-<li><p>create bigquery datasets surveycto and surveycto_dev</p></li>
-<li><p>for those two datasets, give service account the role “bigquery data editor”</p></li>
-<li><p>update warehouse.yaml file, including auth_file based on name of json file</p></li>
-<li><p>update surveycto.yaml file</p></li>
-</ol>
-<ul>
-<li>create secrets GOOGLE_TOKEN and SCTO_AUTH for GitHub Actions</li>
-<li>make sure GitHub secret SCTO_AUTH has no trailing line break</li>
-</ul>
 <p>For more details, see the <a href="https://agency-fund.github.io/syncsurveycto/reference/index.html">reference documentation</a>.</p>
 </div>
 </div>
