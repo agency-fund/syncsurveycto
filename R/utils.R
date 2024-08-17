@@ -2,21 +2,19 @@
 #' @import cli
 #' @import data.table
 #' @import DBI
+#' @importFrom foreach foreach getDoParWorkers %do% %dopar%
 #' @importFrom glue glue
+#' @import rsurveycto
 NULL
 
-library('checkmate')
-library('cli')
-library('data.table')
-library('DBI')
-library('doParallel')
-library('glue')
-library('rsurveycto')
 
-# create secrets GOOGLE_TOKEN and SCTO_AUTH for GitHub Actions
-# make sure GitHub secret SCTO_AUTH has no trailing line break
-
-
+#' Get parameters from a yaml file
+#'
+#' If GitHub Actions is running on the main branch, use prod. Otherwise dev.
+#'
+#' @param path String indicating path to the yaml file.
+#'
+#' @export
 get_params = \(path) {
   params_raw = yaml::read_yaml(path)
   envir = if (Sys.getenv('GITHUB_REF_NAME') == 'main') 'prod' else 'dev'
@@ -54,8 +52,11 @@ set_bq_auth = \(auth_file = NULL) {
 
 
 connect = \(params, check = TRUE) {
-  drv = switch(params$platform, bigquery = bigrquery::bigquery())#,
-  # postgres = RPostgres::Postgres(), sqlite = RSQLite::SQLite())
+  drv = switch(
+    params$platform,
+    bigquery = bigrquery::bigquery(),
+    postgres = RPostgres::Postgres())
+
   db_args = params[setdiff(names(params), c('auth_file', 'platform'))]
   con = do.call(dbConnect, c(drv = drv, db_args))
   if (isFALSE(check)) return(con)
@@ -101,7 +102,8 @@ check_form_versions = \(auth, con, id) {
   ver_cols = c('form_version', 'date_str', 'actor')
 
   versions_missing = fsetdiff(
-    versions_wh[, ..ver_cols], versions_scto[, ..ver_cols])
+    versions_wh[, ver_cols, with = FALSE],
+    versions_scto[, ver_cols, with = FALSE])
   ver_ok = nrow(versions_missing) == 0L
   ver_ok
 }
@@ -111,6 +113,13 @@ check_streams = \(auth, con, streams, catalog_scto) {
   assert_data_table(streams)
   assert_names(
     colnames(streams), type = 'unique', permutation.of = c('id', 'sync_mode'))
+
+  table_name = id = type = id_unique = sync_mode_supp_ok = sync_mode =
+    form_version_ok = `_extracted_at` = type_wh = sync_mode_wh =
+    discriminator_wh = discriminator = dataset_version_wh = dataset_version =
+    created_at = created_at_wh = id_in_scto = sync_mode_unch_ok = type_ok =
+    discriminator_ok = created_at_ok = table_name_unique = dataset_version_ok =
+    NULL
 
   streams_merge = merge(streams, catalog_scto, by = 'id', all.x = TRUE)
   streams_merge[, table_name := fix_names(id)]
@@ -256,6 +265,10 @@ set_extracted_cols = function(d, extracted_at = NULL) {
 
 
 get_extracted_colnames = \() c('_extracted_at', '_extracted_uuid')
+
+
+get_package_version = function(package = 'syncsurveycto') {
+  as.character(utils::packageVersion(package))}
 
 
 rbind_custom = \(...) {

@@ -38,6 +38,7 @@ sync_table = \(
       num_rows = nrow(table_new)
 
     } else {
+      KEY = NULL
       table_rbind = rbind_custom(table_wh, table_scto) # 1 or 2 rows per KEY
       extr_cols = get_extracted_colnames()
       by_cols = setdiff(colnames(table_rbind), extr_cols)
@@ -46,8 +47,9 @@ sync_table = \(
         table_keep = table_keep[KEY %in% table_scto$KEY, .SD[.N], by = 'KEY']
       }
       db_write_table(con, name, table_keep, overwrite = TRUE)
-      num_rows = nrow(fsetdiff(
-        table_keep[, ..extr_cols], table_wh[, ..extr_cols])) # perfect < good
+      num_rows = nrow(fsetdiff( # perfect < good
+        table_keep[, extr_cols, with = FALSE],
+        table_wh[, extr_cols, with = FALSE]))
     }
   }
 
@@ -154,10 +156,8 @@ sync_runs = \(con, wh_params, extracted_at) {
   setnames(run_now, 'user', 'local_user')
 
   is_local = is.na(run_now$github_repository)
-  run_now[, `:=`(
-    local_head = if (is_local) git2r::repository_head()$name else NA_character_,
-    local_sha = if (is_local) git2r::last_commit()$sha else NA_character_,
-    environment = wh_params$environment)]
+  set(run_now, j = 'environment', value = wh_params$environment)
+  set(run_now, j = 'syncsurveycto_version', value = get_package_version())
 
   sync_table(con, '_runs', run_now, 'append', extracted_at)
 }
@@ -167,14 +167,26 @@ sync_syncs = \(con, stream, num_rows, extracted_at) {
   cols = c(
     'id', 'type', 'form_version', 'dataset_version', 'created_at',
     'discriminator', 'sync_mode')
-  d = stream[, ..cols][, num_rows_loaded := num_rows]
+  d = stream[, cols, with = FALSE]
+  set(d, j = 'num_rows_loaded', value = num_rows)
+  set(d, j = 'syncsurveycto_version', value = get_package_version())
   sync_table(con, '_syncs', d, 'append', extracted_at)
 }
 
 
+#' Sync data from SurveyCTO to a data warehouse
+#'
+#' @param scto_params List of parameters for SurveyCTO.
+#' @param wh_params List of parameters for the data warehouse.
+#'
+#' @export
 sync_surveycto = \(scto_params, wh_params) {
   auth = get_scto_auth(scto_params$auth_file)
-  streams = rbindlist(scto_params$streams)
+  if (wh_params$platform == 'bigquery') {
+    set_bq_auth(wh_params$auth_file)
+    withr::defer(bigrquery::bq_deauth())
+  }
+  streams = rbindlist(scto_params$streams, use.names = TRUE, fill = TRUE)
 
   con = connect(wh_params)
   extracted_at = .POSIXct(Sys.time(), tz = 'UTC')
@@ -187,7 +199,8 @@ sync_surveycto = \(scto_params, wh_params) {
   if (nrow(streams_ok) > 0L) {
     sync_catalog(con, catalog_scto, 'overwrite', extracted_at)
 
-    feo = foreach(s = iter(streams_ok, by = 'row'), .errorhandling = 'pass')
+    s = NULL
+    feo = foreach(s = iterators::iter(streams_ok, by = 'row'))
     res = feo %dopar% {
       if (getDoParWorkers() > 1L) con = connect(wh_params, FALSE)
 
@@ -208,16 +221,26 @@ sync_surveycto = \(scto_params, wh_params) {
       n
     }
 
-    idx_skip = sapply(res, \(x) is.numeric(x) && x < 0)
-    ids_skip = c(setdiff(streams$id, streams_ok$id), streams_ok$id[idx_skip])
+    status = sapply(res, \(x) {
+      if (inherits(x, 'error')) 'failed'
+      else if (x >= 0L) 'succeeded'
+      else 'skipped'
+    })
+
+    ids_succeed = streams_ok$id[status == 'succeeded']
+    if (length(ids_succeed) > 0L) {
+      cli_alert_success('Sync succeeded for id{?s} {.val {ids_succeed}}.')
+    }
+
+    ids_skip = c(
+      setdiff(streams$id, streams_ok$id), streams_ok$id[status == 'skipped'])
     if (length(ids_skip) > 0L) {
       cli_alert_warning('Sync skipped for id{?s} {.val {ids_skip}}.')
     }
 
-    idx_err = sapply(res, \(x) inherits(x, 'error'))
-    if (any(idx_err)) {
-      ids_err = streams_ok$id[idx_err]
-      cli_abort('Sync failed for id{?s} {.val {ids_err}}.')
+    ids_fail = streams_ok$id[status == 'failed']
+    if (length(ids_fail) > 0L) {
+      cli_abort('Sync failed for id{?s} {.val {ids_fail}}.')
     }
 
   } else {

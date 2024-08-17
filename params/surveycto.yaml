@@ -1,0 +1,18 @@
+auth_file: scto_auth.txt
+environments:
+
+  # >>>>> THIS IS SPARTA!
+  - name: prod
+    streams:
+      - id: bailiwicks
+        sync_mode: overwrite
+      - id: hh_listing_example_1
+        sync_mode: deduped
+  # <<<<< THIS IS SPARTA!
+
+  - name: dev
+    streams:
+      - id: bailiwicks
+        sync_mode: overwrite
+      - id: hh_listing_example_1
+        sync_mode: deduped

@@ -10,3 +10,5 @@
 ^README\.md$
 ^LICENSE\.md$
 ^CRAN-SUBMISSION$
+^params$
+^secrets$

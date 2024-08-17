@@ -1,0 +1,9 @@
+auth_file: agencyfund-raw-e23214da9143.json
+platform: bigquery
+environments:
+  - name: prod
+    project: agencyfund-raw
+    dataset: surveycto
+  - name: dev
+    project: agencyfund-raw
+    dataset: surveycto_dev

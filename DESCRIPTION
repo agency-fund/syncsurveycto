@@ -4,9 +4,9 @@ Title: Sync Data from SurveyCTO to a Data Warehouse
 Version: 0.1
 Authors@R: c(
   person('Jake', 'Hughey', , 'jake@agency.fund', c('aut', 'cre')))
-Description: 
+Description: Sync data from SurveyCTO to a data warehouse.
 URL: https://agency-fund.github.io/syncsurveycto/, https://github.com/agency-fund/syncsurveycto
-License: MIT + file LICENSE
+License: Apache License (>= 2)
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.2
@@ -18,13 +18,17 @@ Imports:
   cli (>= 3.6.3),
   data.table (>= 1.15.4),
   DBI (>= 1.2.3),
-  doParallel (>= 1.0.17),
   foreach (>= 1.5.2),
   glue (>= 1.7.0),
   iterators (>= 1.0.14),
-  RPostgres (>= 1.4.7)
-  rsurveycto (>= 0.2.0)
+  openssl (>= 2.2.1),
+  RPostgres (>= 1.4.7),
+  rsurveycto (>= 0.2.0),
+  uuid (>= 1.2-1),
+  withr (>= 3.0.1),
+  yaml (>= 2.3.10)
 Suggests:
+  doParallel (>= 1.0.17),
   knitr,
   rmarkdown,
   testthat (>= 3.2.1.1)
