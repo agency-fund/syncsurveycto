@@ -1,3 +1,10 @@
+#' @import checkmate
+#' @import cli
+#' @import data.table
+#' @import DBI
+#' @importFrom glue glue
+NULL
+
 library('checkmate')
 library('cli')
 library('data.table')

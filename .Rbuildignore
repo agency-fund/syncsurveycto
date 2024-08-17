@@ -1,0 +1,12 @@
+^_pkgdown\.yml$
+^.*\.Rproj$
+^\.github$
+^\.Rproj\.user$
+^codecov\.yml$
+^cran-comments\.md$
+^data-raw$
+^docs$
+^NEWS\.md$
+^README\.md$
+^LICENSE\.md$
+^CRAN-SUBMISSION$
