@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{get_params}
 \alias{get_params}
-\title{Get parameters from a yaml file based on the current git branch}
+\title{Get parameters from a yaml file}
 \usage{
 get_params(path)
 }
@@ -10,5 +10,5 @@ get_params(path)
 \item{path}{String indicating path to the yaml file.}
 }
 \description{
-Get parameters from a yaml file based on the current git branch
+If GitHub Actions is running on the main branch, use prod. Otherwise dev.
 }
