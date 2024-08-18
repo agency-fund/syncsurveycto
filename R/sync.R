@@ -1,7 +1,7 @@
 sync_table = \( # nolint
   con, name, table_scto, sync_mode, extracted_at = NULL, type = NULL) {
 
-  setnames(table_scto, \(x) fix_names(x, 'column'))
+  setnames(table_scto, \(x) fix_names(con, x, 'column'))
   set_extracted_cols(table_scto, extracted_at)
 
   cols_wh = db_list_fields(con, name)
@@ -66,7 +66,7 @@ sync_form_metadata = \(
   versions_scto = scto_get_form_metadata(auth, id, get_defs = FALSE)
   versions_scto = versions_scto[, !'form_id']
 
-  id_wh = fix_names(id)
+  id_wh = fix_names(con, id)
   versions_wh = db_read_table(con, glue('{id_wh}__versions'))
   if (is.null(versions_wh)) {
     versions_new = versions_scto
@@ -96,7 +96,7 @@ sync_form = \(
   extracted_at = NULL) {
   sync_mode = match.arg(sync_mode)
 
-  id_wh = fix_names(id)
+  id_wh = fix_names(con, id)
   data_scto = scto_read(auth, id) # pull all in case deleted fields or records
   num_rows = sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
 
@@ -111,8 +111,8 @@ sync_dataset = \(
   sync_mode = match.arg(sync_mode)
   table_scto = scto_read(auth, id)
 
-  cols_wh = db_list_fields(con, fix_names(id))
-  cols_scto = fix_names(colnames(table_scto), 'column')
+  cols_wh = db_list_fields(con, fix_names(con, id))
+  cols_scto = fix_names(con, colnames(table_scto), 'column')
   cols_missing = setdiff(cols_wh, c(cols_scto, get_extracted_colnames()))
   if (!is.null(cols_wh) && length(cols_missing) > 0L) {
     cli_alert_warning(c( # check for datasets, since no created_at

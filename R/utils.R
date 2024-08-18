@@ -71,14 +71,18 @@ connect = \(params, check = TRUE) {
 }
 
 
-fix_names = \(x, name_type = c('table', 'column')) {
+fix_names = \(con, x, name_type = c('table', 'column')) {
   name_type = match.arg(name_type)
   # https://cloud.google.com/bigquery/docs/schemas#column_names
   y = gsub('[^a-zA-Z0-9_]', '_', x) # bigquery is case sensitive
-  idx = x != y # hack to prevent name collisions
+
+  platform = if (inherits(con, 'BigQueryConnection')) 'bigquery' else NULL
+
+  idx = (x != y) | (tolower(x) %in% tolower(reserved_keywords[[platform]]))
   if (name_type == 'table') {
     idx = idx | grepl('^.+__(choices|settings|survey|versions)$', x)
   }
+  # hack to prevent name collisions
   y[idx] = paste(y[idx], substr(openssl::sha1(x[idx]), 1L, 6L), sep = '_')
   y
 }
@@ -94,7 +98,7 @@ get_supported_sync_modes = \(type) {
 
 
 check_form_versions = \(auth, con, id) {
-  id_wh = fix_names(id)
+  id_wh = fix_names(con, id)
   versions_wh = db_read_table(con, glue('{id_wh}__versions'))
   if (is.null(versions_wh)) return(TRUE)
 
@@ -122,7 +126,7 @@ check_streams = \(auth, con, streams, catalog_scto) {
     NULL
 
   streams_merge = merge(streams, catalog_scto, by = 'id', all.x = TRUE)
-  streams_merge[, table_name := fix_names(id)]
+  streams_merge[, table_name := fix_names(con, id)]
   streams_merge[, `:=`(
     id_in_scto = !is.na(type),
     id_unique = !(duplicated(id) | duplicated(id, fromLast = TRUE)))]
