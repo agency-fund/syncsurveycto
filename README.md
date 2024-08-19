@@ -19,4 +19,4 @@ pak::pak('agency-fund/syncsurveycto')
 
 ## Usage
 
-For more details, see the [reference documentation](https://agency-fund.github.io/syncsurveycto/reference/index.html).
+See the package in action [here](https://github.com/agency-fund/syncsurveycto-rsurveycto). For more details, see the [reference documentation](https://agency-fund.github.io/syncsurveycto/reference/index.html).
