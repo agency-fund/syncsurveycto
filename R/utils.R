@@ -1,3 +1,4 @@
+#' @import bigrquery
 #' @import checkmate
 #' @import cli
 #' @import data.table
@@ -47,14 +48,14 @@ set_bq_auth = \(auth_file = NULL) {
   } else {
     NULL
   }
-  bigrquery::bq_auth(path = path)
+  bq_auth(path = path)
 }
 
 
 connect = \(params, check = TRUE) {
   drv = switch(
     params$platform,
-    bigquery = bigrquery::bigquery(),
+    bigquery = bigquery(),
     postgres = RPostgres::Postgres())
 
   db_args = params[setdiff(names(params), c('auth_file', 'platform'))]
@@ -294,25 +295,32 @@ db_list_fields = \(con, name) {
 }
 
 
-get_fields = \(con, d) {
-  if (!inherits(con, 'BigQueryConnection')) return(NULL)
-  bigrquery::as_bq_fields(d) # enforce form version as string
-}
-
-
-db_write_table = \(con, name, value, ...) {
-  fields = get_fields(con, value)
-  dbWriteTable(con, name, value, fields = fields, ...)
+db_overwrite_table = \(con, name, value, ...) {
+  if (inherits(con, 'BigQueryConnection')) {
+    bq_table_upload(
+      bq_table(con@project, con@dataset, name), value,
+      fields = as_bq_fields(value), # enforce form version as string
+      write_disposition = 'WRITE_TRUNCATE')
+  } else {
+    dbWriteTable(con, name, value, overwrite = TRUE)
+  }
+  invisible(TRUE)
 }
 
 
 db_append_table = \(con, name, value, cols_wh) {
   if (setequal(cols_wh, colnames(value))) {
-    dbAppendTable(con, name, value)
+    if (inherits(con, 'BigQueryConnection')) {
+      bq_table_upload(
+        bq_table(con@project, con@dataset, name), value,
+        write_disposition = 'WRITE_APPEND')
+    } else {
+      dbAppendTable(con, name, value)
+    }
   } else {
     table_wh = db_read_table(con, name)
     table_rbind = rbind_custom(table_wh, value)
-    db_write_table(con, name, table_rbind, overwrite = TRUE)
+    db_overwrite_table(con, name, table_rbind)
   }
   invisible(TRUE)
 }
