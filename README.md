@@ -6,7 +6,7 @@
 
 ## Overview
 
-stuff.
+Sync data from SurveyCTO to a data warehouse.
 
 ## Installation
 

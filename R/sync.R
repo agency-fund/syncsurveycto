@@ -14,7 +14,7 @@ sync_table = \( # nolint
 
   } else if (
     nrow(table_scto) > 0L && (sync_mode == 'overwrite' || is.null(cols_wh))) {
-    db_write_table(con, name, table_scto, overwrite = TRUE)
+    db_overwrite_table(con, name, table_scto)
     num_rows = nrow(table_scto)
 
   } else if (nrow(table_scto) > 0L && sync_mode == 'append') {
@@ -29,10 +29,10 @@ sync_table = \( # nolint
       table_new = table_scto[!table_wh, on = '_form_version']
       if (nrow(table_new) > 0L) {
         if (cols_equal) {
-          dbAppendTable(con, name, table_new)
+          db_append_table(con, name, table_new, cols_wh)
         } else {
           table_rbind = rbind_custom(table_wh, table_new)
-          db_write_table(con, name, table_rbind, overwrite = TRUE)
+          db_overwrite_table(con, name, table_rbind)
         }
       }
       num_rows = nrow(table_new)
@@ -46,7 +46,7 @@ sync_table = \( # nolint
       if (sync_mode == 'deduped') { # if 2 rows of same KEY, keep later
         table_keep = table_keep[KEY %in% table_scto$KEY, .SD[.N], by = 'KEY']
       }
-      db_write_table(con, name, table_keep, overwrite = TRUE)
+      db_overwrite_table(con, name, table_keep)
       num_rows = nrow(fsetdiff( # perfect < good
         table_keep[, extr_cols, with = FALSE],
         table_wh[, extr_cols, with = FALSE]))
@@ -183,7 +183,7 @@ sync_surveycto = \(scto_params, wh_params) {
   auth = get_scto_auth(scto_params$auth_file)
   if (wh_params$platform == 'bigquery') {
     set_bq_auth(wh_params$auth_file)
-    withr::defer(bigrquery::bq_deauth())
+    withr::defer(bq_deauth())
   }
   streams = rbindlist(scto_params$streams, use.names = TRUE, fill = TRUE)
 

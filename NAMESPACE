@@ -3,6 +3,7 @@
 export(get_params)
 export(sync_surveycto)
 import(DBI)
+import(bigrquery)
 import(checkmate)
 import(cli)
 import(data.table)
