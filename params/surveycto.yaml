@@ -16,3 +16,4 @@ environments:
         sync_mode: overwrite
       - id: hh_listing_example_1
         sync_mode: deduped
+        review_status: approved

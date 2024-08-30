@@ -93,11 +93,13 @@ sync_form_metadata = \(
 
 sync_form = \(
   auth, con, id, sync_mode = get_supported_sync_modes('form'),
-  extracted_at = NULL) {
+  extracted_at = NULL, review_status = 'approved') {
   sync_mode = match.arg(sync_mode)
+  review_status = strsplit(review_status, '_')[[1L]]
 
   id_wh = fix_names(con, id)
-  data_scto = scto_read(auth, id) # pull all in case deleted fields or records
+  # don't use start_date, in case deleted fields or records
+  data_scto = scto_read(auth, id, review_status = review_status)
   num_rows = sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
 
   sync_form_metadata(auth, con, id, sync_mode, extracted_at)
@@ -107,7 +109,7 @@ sync_form = \(
 
 sync_dataset = \(
   auth, con, id, sync_mode = get_supported_sync_modes('dataset'),
-  extracted_at = NULL) {
+  extracted_at = NULL, ...) {
   sync_mode = match.arg(sync_mode)
   table_scto = scto_read(auth, id)
 
@@ -115,7 +117,7 @@ sync_dataset = \(
   cols_scto = fix_names(con, colnames(table_scto), 'column')
   cols_missing = setdiff(cols_wh, c(cols_scto, get_extracted_colnames()))
   if (!is.null(cols_wh) && length(cols_missing) > 0L) {
-    cli_alert_warning(c( # check for datasets, since no created_at
+    cli_alert_warning(c( # could only happen if dataset deleted and recreated
       'Skipping dataset {.val {id}}, which has columns ',
       'in the warehouse that are not in SurveyCTO.'))
     return(invisible(-1L))
@@ -164,8 +166,8 @@ sync_runs = \(con, wh_params, extracted_at) {
 
 sync_syncs = \(con, stream, num_rows, extracted_at) {
   cols = c(
-    'id', 'type', 'form_version', 'dataset_version', 'created_at',
-    'discriminator', 'sync_mode')
+    'id', 'type', 'form_version', 'dataset_version', 'last_version_created_at',
+    'discriminator', 'sync_mode', 'review_status')
   d = stream[, cols, with = FALSE]
   set(d, j = 'num_rows_loaded', value = num_rows)
   set_package_version(d)
@@ -214,7 +216,8 @@ sync_surveycto = \(scto_params, wh_params) {
 
     sync_stream = if (s$type == 'dataset') sync_dataset else sync_form
     n = tryCatch(
-      sync_stream(auth, con, s$id, s$sync_mode, extracted_at), error = \(e) e)
+      sync_stream(auth, con, s$id, s$sync_mode, extracted_at, s$review_status),
+      error = \(e) e)
 
     if (inherits(n, 'error')) {
       cli_bullets(

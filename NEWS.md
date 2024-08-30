@@ -1,3 +1,6 @@
+# syncsurveycto 0.1.4
+* Added support for `review_status` of form submissions.
+
 # syncsurveycto 0.1.3
 * Switched to low-level API for BigQuery.
 

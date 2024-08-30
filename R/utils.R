@@ -28,7 +28,7 @@ get_params = \(path) {
 }
 
 
-get_scto_auth = function(auth_file = NULL) {
+get_scto_auth = \(auth_file = NULL) {
   if (Sys.getenv('SCTO_AUTH') == '') {
     auth_path = file.path('secrets', auth_file)
   } else {
@@ -117,14 +117,16 @@ check_form_versions = \(auth, con, id) {
 check_streams = \(auth, con, streams, catalog_scto) {
   assert_data_table(streams)
   assert_names(
-    colnames(streams), type = 'unique', permutation.of = c('id', 'sync_mode'))
+    colnames(streams), type = 'unique', must.include = c('id', 'sync_mode'),
+    subset.of = c('id', 'sync_mode', 'review_status'))
 
   table_name = id = type = id_unique = sync_mode_supp_ok = sync_mode =
     form_version_ok = `_extracted_at` = type_wh = sync_mode_wh = # nolint
     discriminator_wh = discriminator = dataset_version_wh = dataset_version =
-    created_at = created_at_wh = id_in_scto = sync_mode_unch_ok = type_ok =
-    discriminator_ok = created_at_ok = table_name_unique = dataset_version_ok =
-    NULL
+    # created_at = created_at_wh = created_at_ok =
+    id_in_scto = sync_mode_unch_ok = type_ok = discriminator_ok =
+    table_name_unique = dataset_version_ok = review_status = review_status_wh =
+    review_status_ok = review_status_unch_ok = NULL
 
   streams_merge = merge(streams, catalog_scto, by = 'id', all.x = TRUE)
   streams_merge[, table_name := fix_names(con, id)]
@@ -150,6 +152,26 @@ check_streams = \(auth, con, streams, catalog_scto) {
     form_version_ok := check_form_versions(auth, con, .BY$id),
     by = id]
 
+  if (is.null(streams_merge$review_status)) {
+    streams_merge[type == 'form', review_status := 'approved']
+    streams_merge[, review_status_ok := TRUE]
+  } else {
+    streams_merge[
+      type == 'form',
+      review_status := fifelse(
+        is.na(review_status), 'approved',
+        paste(sort(strsplit(review_status, '_')[[1L]]), collapse = '_')),
+      by = id]
+
+    streams_merge[type == 'dataset', review_status_ok := is.na(review_status)]
+    streams_merge[
+      type == 'form',
+      review_status_ok := test_names(
+        strsplit(review_status, '_')[[1L]], type = 'unique',
+        subset.of = c('approved', 'pending', 'rejected')),
+      by = id]
+  }
+
   syncs_wh = db_read_table(con, '_syncs')
 
   if (is.null(syncs_wh)) {
@@ -158,7 +180,8 @@ check_streams = \(auth, con, streams, catalog_scto) {
       sync_mode_unch_ok = TRUE,
       discriminator_ok = TRUE,
       dataset_version_ok = TRUE,
-      created_at_ok = TRUE)]
+      # created_at_ok = TRUE,
+      review_status_unch_ok = TRUE)]
 
   } else {
     streams_wh = syncs_wh[
@@ -166,6 +189,9 @@ check_streams = \(auth, con, streams, catalog_scto) {
     streams_merge = merge(
       streams_merge, streams_wh, by = 'id', suffixes = c('', '_wh'),
       all.x = TRUE)
+    if (is.null(streams_merge$review_status_wh)) {
+      streams_merge[type_wh == 'form', review_status_wh := 'approved']
+    }
 
     streams_merge[, `:=`(
       type_ok = is.na(type_wh) | type == type_wh,
@@ -174,16 +200,17 @@ check_streams = \(auth, con, streams, catalog_scto) {
         discriminator == discriminator_wh,
       dataset_version_ok = type == 'form' | is.na(dataset_version_wh) |
         dataset_version >= dataset_version_wh,
-      created_at_ok = is.na(created_at) | is.na(created_at_wh) |
-        created_at == created_at_wh)]
+      # created_at_ok = is.na(created_at) | is.na(created_at_wh) |
+      #   created_at == created_at_wh,
+      review_status_unch_ok = is.na(review_status) | is.na(review_status_wh) |
+        review_status == review_status_wh)]
   }
 
   streams_ok = streams_merge[
-    id_in_scto == TRUE & id_unique == TRUE & table_name_unique == TRUE &
-      sync_mode_supp_ok == TRUE & sync_mode_unch_ok == TRUE &
-      type_ok == TRUE & discriminator_ok == TRUE &
-      dataset_version_ok == TRUE & created_at_ok == TRUE &
-      form_version_ok == TRUE]
+    id_in_scto & id_unique & table_name_unique & sync_mode_supp_ok &
+      sync_mode_unch_ok & type_ok & discriminator_ok & dataset_version_ok &
+      # created_at_ok &
+      form_version_ok & review_status_ok & review_status_unch_ok]
 
   streams_skip = streams_merge[id_in_scto == FALSE]
   if (nrow(streams_skip) > 0L) {
@@ -241,12 +268,12 @@ check_streams = \(auth, con, streams, catalog_scto) {
       'version has decreased since the previous sync.'))
   }
 
-  streams_skip = streams_merge[created_at_ok == FALSE]
-  if (nrow(streams_skip) > 0L) {
-    cli_alert_warning(c(
-      'Skipping id{?s} {.val {streams_skip$id}}, whose creation ',
-      'timestamp has changed since the previous sync.'))
-  }
+  # streams_skip = streams_merge[created_at_ok == FALSE]
+  # if (nrow(streams_skip) > 0L) {
+  #   cli_alert_warning(c(
+  #     'Skipping id{?s} {.val {streams_skip$id}}, whose creation ',
+  #     'timestamp has changed since the previous sync.'))
+  # }
 
   streams_skip = streams_merge[form_version_ok == FALSE]
   if (nrow(streams_skip) > 0L) {
@@ -255,11 +282,25 @@ check_streams = \(auth, con, streams, catalog_scto) {
       'definition versions in the warehouse that are not in SurveyCTO.'))
   }
 
+  streams_skip = streams_merge[review_status_ok == FALSE]
+  if (nrow(streams_skip) > 0L) {
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, whose ',
+      'review status is invalid for {?its/their} type.'))
+  }
+
+  streams_skip = streams_merge[review_status_unch_ok == FALSE]
+  if (nrow(streams_skip) > 0L) {
+    cli_alert_warning(c(
+      'Skipping id{?s} {.val {streams_skip$id}}, whose ',
+      'review status has changed since the previous sync.'))
+  }
+
   streams_ok
 }
 
 
-set_extracted_cols = function(d, extracted_at = NULL) {
+set_extracted_cols = \(d, extracted_at = NULL) {
   if (!is.null(extracted_at)) {
     assert_posixct(extracted_at, len = 1L, any.missing = FALSE)
     set(d, j = '_extracted_at', value = extracted_at)
