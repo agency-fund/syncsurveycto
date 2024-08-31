@@ -25,10 +25,8 @@ sync_table = \( # nolint
     nrow(table_scto) > 0L && sync_mode %in% c('incremental', 'deduped')) {
     table_wh = db_read_table(con, name)
 
-    if (isTRUE(type == 'form_metadata')) {
-      ver_col = intersect(
-        c('form_version', '_form_version'), colnames(table_scto))[1L]
-      table_new = table_scto[!table_wh, on = ver_col]
+    if (isTRUE(type == 'form_def')) {
+      table_new = table_scto[!table_wh, on = '_form_version']
       if (nrow(table_new) > 0L) {
         if (cols_equal) {
           db_append_table(con, name, table_new, cols_wh)
@@ -40,13 +38,20 @@ sync_table = \( # nolint
       num_rows = nrow(table_new)
 
     } else {
-      KEY = NULL # nolint
-      table_rbind = rbind_custom(table_wh, table_scto) # 1 or 2 rows per KEY
+      table_rbind = rbind_custom(table_wh, table_scto) # 1 or 2 rows per key
       extr_cols = get_extracted_colnames()
       by_cols = setdiff(colnames(table_rbind), extr_cols)
       table_keep = unique(table_rbind, by = by_cols) # if 2 dupes, keep earlier
-      if (sync_mode == 'deduped') { # if 2 rows of same KEY, keep later
-        table_keep = table_keep[KEY %in% table_scto$KEY, .SD[.N], by = 'KEY']
+
+      if (sync_mode == 'deduped') { # if 2 rows of same key, keep later
+        # should work for form submissions and form versions
+        key_col_i = NULL
+        key_col = intersect(c('KEY', 'form_version'), colnames(table_scto))[1L]
+        table_keep = table_keep[
+          key_col_i %in% table_scto[[key_col]], .SD[.N], by = key_col,
+          env = list(key_col_i = key_col)]
+        # KEY = NULL # nolint
+        # table_keep = table_keep[KEY %in% table_scto$KEY, .SD[.N], by = 'KEY']
       }
       db_overwrite_table(con, name, table_keep)
       num_rows = nrow(fsetdiff( # perfect < good
@@ -79,15 +84,14 @@ sync_form_metadata = \(
 
   if (nrow(versions_new) > 0L) {
     sync_table(
-      con, glue('{id_wh}__versions'), versions_scto, sync_mode, extracted_at,
-      type = 'form_metadata')
+      con, glue('{id_wh}__versions'), versions_scto, sync_mode, extracted_at)
 
     metadata_scto = scto_get_form_metadata(auth, id)
     form_defs = scto_unnest_form_definitions(metadata_scto, by_form_id = FALSE)
     for (element in c('survey', 'choices', 'settings')) {
       sync_table(
         con, glue('{id_wh}__{element}'), form_defs[[element]][, !'_form_id'],
-        sync_mode, extracted_at, type = 'form_metadata')
+        sync_mode, extracted_at, type = 'form_def')
     }
   }
   invisible(TRUE)
