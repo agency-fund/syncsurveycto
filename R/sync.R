@@ -25,8 +25,10 @@ sync_table = \( # nolint
     nrow(table_scto) > 0L && sync_mode %in% c('incremental', 'deduped')) {
     table_wh = db_read_table(con, name)
 
-    if (isTRUE(type == 'form_def')) {
-      table_new = table_scto[!table_wh, on = '_form_version']
+    if (isTRUE(type == 'form_metadata')) {
+      ver_col = intersect(
+        c('form_version', '_form_version'), colnames(table_scto))[1L]
+      table_new = table_scto[!table_wh, on = ver_col]
       if (nrow(table_new) > 0L) {
         if (cols_equal) {
           db_append_table(con, name, table_new, cols_wh)
@@ -77,14 +79,15 @@ sync_form_metadata = \(
 
   if (nrow(versions_new) > 0L) {
     sync_table(
-      con, glue('{id_wh}__versions'), versions_scto, sync_mode, extracted_at)
+      con, glue('{id_wh}__versions'), versions_scto, sync_mode, extracted_at,
+      type = 'form_metadata')
 
     metadata_scto = scto_get_form_metadata(auth, id)
     form_defs = scto_unnest_form_definitions(metadata_scto, by_form_id = FALSE)
     for (element in c('survey', 'choices', 'settings')) {
       sync_table(
         con, glue('{id_wh}__{element}'), form_defs[[element]][, !'_form_id'],
-        sync_mode, extracted_at, type = 'form_def')
+        sync_mode, extracted_at, type = 'form_metadata')
     }
   }
   invisible(TRUE)

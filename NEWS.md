@@ -1,3 +1,6 @@
+# syncsurveycto 0.1.5
+* Fixed sync for form metadata.
+
 # syncsurveycto 0.1.4
 * Added support for `review_status` of form submissions.
 
