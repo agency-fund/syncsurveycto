@@ -50,8 +50,6 @@ sync_table = \( # nolint
         table_keep = table_keep[
           key_col_i %in% table_scto[[key_col]], .SD[.N], by = key_col,
           env = list(key_col_i = key_col)]
-        # KEY = NULL # nolint
-        # table_keep = table_keep[KEY %in% table_scto$KEY, .SD[.N], by = 'KEY']
       }
       db_overwrite_table(con, name, table_keep)
       num_rows = nrow(fsetdiff( # perfect < good
