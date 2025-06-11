@@ -1,3 +1,6 @@
+# syncsurveycto 0.1.6
+* Fixed sync for table having zero rows.
+
 # syncsurveycto 0.1.5
 * Fixed sync for form metadata.
 

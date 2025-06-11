@@ -301,6 +301,7 @@ check_streams = \(auth, con, streams, catalog_scto) {
 
 
 set_extracted_cols = \(d, extracted_at = NULL) {
+  if (nrow(d) == 0L) return(invisible(d))
   if (!is.null(extracted_at)) {
     assert_posixct(extracted_at, len = 1L, any.missing = FALSE)
     set(d, j = '_extracted_at', value = extracted_at)
