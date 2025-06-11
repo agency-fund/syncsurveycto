@@ -6,6 +6,7 @@ sync_table = \( # nolint
 
   cols_wh = db_list_fields(con, name)
   cols_equal = setequal(cols_wh, colnames(table_scto))
+  num_rows = nrow(table_scto) # could get overwritten
 
   if (nrow(table_scto) == 0L && (sync_mode %in% c('overwrite', 'deduped')) &&
       !is.null(cols_wh)) {
