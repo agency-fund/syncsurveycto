@@ -1,0 +1,36 @@
+# syncsurveycto
+
+[![R-CMD-check](https://github.com/agency-fund/syncsurveycto/workflows/R-CMD-check/badge.svg)](https://github.com/agency-fund/syncsurveycto/actions)
+[![codecov](https://codecov.io/gh/agency-fund/syncsurveycto/branch/main/graph/badge.svg)](https://codecov.io/gh/agency-fund/syncsurveycto)
+[![CRAN
+Status](https://www.r-pkg.org/badges/version/syncsurveycto)](https://cran.r-project.org/package=syncsurveycto)
+
+## Overview
+
+Sync data from SurveyCTO to a data warehouse.
+
+## Installation
+
+Install the development version:
+
+``` r
+# install.packages('pak')
+pak::pak('agency-fund/syncsurveycto')
+```
+
+## Usage
+
+See the package in action
+[here](https://github.com/agency-fund/syncsurveycto-rsurveycto). For
+more details, see the [reference
+documentation](https://agency-fund.github.io/syncsurveycto/reference/index.html).
+
+# Package index
+
+## All functions
+
+- [`get_params()`](https://agency-fund.github.io/syncsurveycto/reference/get_params.md)
+  : Get parameters from a yaml file
+- [`sync_surveycto()`](https://agency-fund.github.io/syncsurveycto/reference/sync_surveycto.md)
+  : Sync data from SurveyCTO to a data warehouse
+
