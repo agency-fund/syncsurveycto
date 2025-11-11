@@ -251,13 +251,25 @@ sync_surveycto = \(scto_params, wh_params) {
 
   ids_skip = c(
     setdiff(streams$id, streams_ok$id), streams_ok$id[status == 'skipped'])
-  if (length(ids_skip) > 0L) {
-    cli_alert_warning('Sync skipped for id{?s} {.val {ids_skip}}.')
+  msg_skip = if (length(ids_skip) > 0L) {
+    'Sync skipped for {qty(ids_skip)} id{?s} {.val {ids_skip}}.'
+  } else {
+    NULL
   }
 
   ids_fail = streams_ok$id[status == 'failed']
-  if (length(ids_fail) > 0L) {
-    cli_abort('Sync failed for id{?s} {.val {ids_fail}}.')
+  msg_fail = if (length(ids_fail) > 0L) {
+    'Sync failed for {qty(ids_fail)} id{?s} {.val {ids_fail}}.'
+  } else {
+    NULL
+  }
+
+  if (length(ids_skip) > 0L && length(ids_fail) > 0L) {
+    cli_abort(paste(msg_skip, msg_fail, sep = '\n'))
+  } else if (length(ids_skip) > 0L) {
+    cli_abort(msg_skip)
+  } else if (length(ids_fail) > 0L) {
+    cli_abort(msg_fail)
   }
 
   invisible(TRUE)
