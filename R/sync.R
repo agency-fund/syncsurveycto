@@ -3,6 +3,7 @@ sync_table = \( # nolint
 
   setnames(table_scto, \(x) fix_names(con, x, 'column'))
   set_extracted_cols(table_scto, extracted_at)
+  extr_cols = get_extracted_colnames()
 
   cols_wh = db_list_fields(con, name)
   cols_equal = setequal(cols_wh, colnames(table_scto))
@@ -10,11 +11,13 @@ sync_table = \( # nolint
 
   if (nrow(table_scto) == 0L && (sync_mode %in% c('overwrite', 'deduped')) &&
       !is.null(cols_wh)) {
+
     dbRemoveTable(con, name)
     num_rows = nrow(table_scto)
 
   } else if (
     nrow(table_scto) > 0L && (sync_mode == 'overwrite' || is.null(cols_wh))) {
+
     db_overwrite_table(con, name, table_scto)
     num_rows = nrow(table_scto)
 
@@ -24,7 +27,8 @@ sync_table = \( # nolint
 
   } else if (
     nrow(table_scto) > 0L && sync_mode %in% c('incremental', 'deduped')) {
-    table_wh = db_read_table(con, name)
+
+    table_wh = db_read_table(con, name, page_size = 10000)
 
     if (isTRUE(type == 'form_def')) {
       table_new = table_scto[!table_wh, on = '_form_version']
@@ -38,9 +42,38 @@ sync_table = \( # nolint
       }
       num_rows = nrow(table_new)
 
+    } else if (isTRUE(type == 'form_responses')) {
+      . = submission_field_name = field_value = field_value_wh = NULL
+
+      table_changed = merge(
+        table_scto[key %in% table_wh$key],
+        table_wh[, .(key, submission_field_name, field_value)],
+        by = c('key', 'submission_field_name'), all.x = TRUE, sort = FALSE,
+        suffixes = c('', '_wh'))
+
+      table_changed = table_changed[
+        field_value != field_value_wh |
+          is.na(field_value) != is.na(field_value_wh)]
+      table_changed[, field_value_wh := NULL]
+
+      table_added = table_scto[key %notin% table_wh$key]
+      table_keep = rbind_custom(table_changed, table_added)
+
+      keys = unique(table_keep$key)
+      if (sync_mode == 'deduped') {
+        keys_removed = setdiff(table_wh$key, table_scto$key)
+        keys = c(keys, keys_removed)
+      }
+
+      statement = glue::glue_sql(
+        'delete {`con@dataset`}.{`name`} where key in ({keys*})', .con = con)
+      dbExecute(con, statement)
+
+      db_append_table(con, name, table_keep, cols_wh)
+      num_rows = nrow(table_keep)
+
     } else {
       table_rbind = rbind_custom(table_wh, table_scto) # 1 or 2 rows per key
-      extr_cols = get_extracted_colnames()
       by_cols = setdiff(colnames(table_rbind), extr_cols)
       table_keep = unique(table_rbind, by = by_cols) # if 2 dupes, keep earlier
 
@@ -99,16 +132,24 @@ sync_form_metadata = \(
 
 sync_form = \(
   auth, con, id, sync_mode = get_supported_sync_modes('form'),
-  extracted_at = NULL, review_status = 'approved') {
+  extracted_at = NULL, review_status = 'approved', responses = TRUE) {
   sync_mode = match.arg(sync_mode)
   review_status = strsplit(review_status, '_')[[1L]]
 
   id_wh = fix_names(con, id)
   # don't use start_date, in case deleted fields or records
-  data_scto = scto_read(auth, id, review_status = review_status)
-  num_rows = sync_table(con, id_wh, data_scto, sync_mode, extracted_at)
+  d = scto_read(auth, id, review_status = review_status)
+  num_rows = sync_table(con, id_wh, d, sync_mode, extracted_at)
 
-  sync_form_metadata(auth, con, id, sync_mode, extracted_at)
+  if (isTRUE(responses)) {
+    r = scto_get_form_responses(auth, id, review_status = review_status)
+    sync_table(
+      con, glue('{id_wh}__responses'), r, sync_mode, extracted_at,
+      type = 'form_responses')
+  } else {
+    sync_form_metadata(auth, con, id, sync_mode, extracted_at)
+  }
+
   invisible(num_rows)
 }
 
