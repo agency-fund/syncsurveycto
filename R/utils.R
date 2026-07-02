@@ -328,7 +328,7 @@ rbind_custom = \(...) {
 
 
 db_read_table = \(con, name, ...) {
-  if (dbExistsTable(con, name)) setDT(dbReadTable(con, name)) else NULL
+  if (dbExistsTable(con, name)) setDT(dbReadTable(con, name, ...)) else NULL
 }
 
 

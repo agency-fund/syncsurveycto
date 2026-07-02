@@ -1,7 +1,7 @@
 Package: syncsurveycto
 Type: Package
 Title: Sync Data from SurveyCTO to a Data Warehouse
-Version: 0.1.7
+Version: 0.2.0
 Authors@R: c(
   person('Jake', 'Hughey', , 'jake@agency.fund', c('aut', 'cre')))
 Description: Sync data from SurveyCTO to a data warehouse.
@@ -9,7 +9,6 @@ URL: https://agency-fund.github.io/syncsurveycto/, https://github.com/agency-fun
 License: Apache License (>= 2)
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.3
 Roxygen: list(markdown = TRUE)
 Depends: R (>= 4.1)
 Imports:
@@ -34,3 +33,4 @@ Suggests:
   testthat (>= 3.2.1.1)
 Config/testthat/edition: 3
 Remotes: agency-fund/rsurveycto
+Config/roxygen2/version: 8.0.0
