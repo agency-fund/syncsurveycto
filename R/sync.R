@@ -28,9 +28,8 @@ sync_table = \( # nolint
   } else if (
     nrow(table_scto) > 0L && sync_mode %in% c('incremental', 'deduped')) {
 
-    table_wh = db_read_table(con, name, page_size = 10000)
-
     if (isTRUE(type == 'form_def')) {
+      table_wh = db_read_table(con, name)
       table_new = table_scto[!table_wh, on = '_form_version']
       if (nrow(table_new) > 0L) {
         if (cols_equal) {
@@ -45,9 +44,14 @@ sync_table = \( # nolint
     } else if (isTRUE(type == 'form_responses')) {
       . = submission_field_name = field_value = field_value_wh = NULL
 
+      # table_wh = db_read_table(con, name, page_size = 10000)
+      statement = glue_sql(
+        'select key, submission_field_name, field_value ',
+        'from {`con@dataset`}.{`name`}', .con = con)
+      table_wh = setDT(dbGetQuery(con, statement))
+
       table_changed = merge(
-        table_scto[key %in% table_wh$key],
-        table_wh[, .(key, submission_field_name, field_value)],
+        table_scto[key %in% table_wh$key], table_wh,
         by = c('key', 'submission_field_name'), all.x = TRUE, sort = FALSE,
         suffixes = c('', '_wh'))
 
@@ -65,7 +69,7 @@ sync_table = \( # nolint
         keys = c(keys, keys_removed)
       }
 
-      statement = glue::glue_sql(
+      statement = glue_sql(
         'delete {`con@dataset`}.{`name`} where key in ({keys*})', .con = con)
       dbExecute(con, statement)
 
@@ -73,6 +77,7 @@ sync_table = \( # nolint
       num_rows = nrow(table_keep)
 
     } else {
+      table_wh = db_read_table(con, name)
       table_rbind = rbind_custom(table_wh, table_scto) # 1 or 2 rows per key
       by_cols = setdiff(colnames(table_rbind), extr_cols)
       table_keep = unique(table_rbind, by = by_cols) # if 2 dupes, keep earlier
@@ -140,14 +145,13 @@ sync_form = \(
   # don't use start_date, in case deleted fields or records
   d = scto_read(auth, id, review_status = review_status)
   num_rows = sync_table(con, id_wh, d, sync_mode, extracted_at)
+  sync_form_metadata(auth, con, id, sync_mode, extracted_at)
 
   if (isTRUE(responses)) {
     r = scto_get_form_responses(auth, id, review_status = review_status)
     sync_table(
       con, glue('{id_wh}__responses'), r, sync_mode, extracted_at,
       type = 'form_responses')
-  } else {
-    sync_form_metadata(auth, con, id, sync_mode, extracted_at)
   }
 
   invisible(num_rows)

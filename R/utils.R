@@ -4,7 +4,7 @@
 #' @import data.table
 #' @import DBI
 #' @importFrom foreach foreach getDoParWorkers %do% %dopar%
-#' @importFrom glue glue
+#' @importFrom glue glue glue_sql
 #' @import rsurveycto
 NULL
 
@@ -337,9 +337,23 @@ db_list_fields = \(con, name) {
 }
 
 
+bq_table_upload_chunked = \(
+  x, values, ..., write_disposition, chunk_size = 1e6) {
+
+  chunk_idx = seq(from = 1, to = nrow(values), by = chunk_size)
+  chunk_idx = cbind(chunk_idx, c(chunk_idx[-1L] - 1, nrow(values)))
+
+  for (i in seq_len(nrow(chunk_idx))) {
+    idx = chunk_idx[i, 1L]:chunk_idx[i, 2L]
+    write_disp_now = if (i == 1L) write_disposition else 'WRITE_APPEND'
+    bq_table_upload(x, values[idx], ..., write_disposition = write_disp_now)
+  }
+}
+
+
 db_overwrite_table = \(con, name, value, ...) {
   if (inherits(con, 'BigQueryConnection')) {
-    bq_table_upload(
+    bq_table_upload_chunked(
       bq_table(con@project, con@dataset, name), value,
       fields = as_bq_fields(value), # enforce form version as string
       write_disposition = 'WRITE_TRUNCATE')
@@ -353,7 +367,7 @@ db_overwrite_table = \(con, name, value, ...) {
 db_append_table = \(con, name, value, cols_wh) {
   if (setequal(cols_wh, colnames(value))) {
     if (inherits(con, 'BigQueryConnection')) {
-      bq_table_upload(
+      bq_table_upload_chunked(
         bq_table(con@project, con@dataset, name), value,
         write_disposition = 'WRITE_APPEND')
     } else {
