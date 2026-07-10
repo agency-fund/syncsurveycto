@@ -340,6 +340,11 @@ db_list_fields = \(con, name) {
 bq_table_upload_chunked = \(
   x, values, ..., write_disposition, chunk_size = 1e6) {
 
+  if (nrow(values) == 0L) {
+    bq_table_upload(x, values, ..., write_disposition = write_disposition)
+    return()
+  }
+
   chunk_idx = seq(from = 1, to = nrow(values), by = chunk_size)
   chunk_idx = cbind(chunk_idx, c(chunk_idx[-1L] - 1, nrow(values)))
 
